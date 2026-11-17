@@ -5,81 +5,383 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>VoiceGuard</title>
 <style>
-  :root { --fg:#1d232a; --muted:#5b6672; --bg:#f6f7f9; --card:#fff; --line:#d9dee4;
-          --low:#2e7d32; --med:#b26a00; --high:#c62828; }
-  body { margin:0; font:15px/1.5 system-ui, sans-serif; color:var(--fg); background:var(--bg); }
-  main { max-width:860px; margin:0 auto; padding:24px 16px; }
-  h1 { font-size:22px; margin:0 0 4px; }
-  p.sub { color:var(--muted); margin:0 0 20px; }
-  form, section { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px; margin-bottom:16px; }
-  label { display:block; margin:8px 0 4px; font-weight:600; }
-  select, input[type=file] { width:100%; }
-  button { margin-top:12px; padding:8px 16px; border:0; border-radius:6px; background:#1f5fbf; color:#fff; font-weight:600; cursor:pointer; }
-  .risk { font-size:20px; font-weight:700; }
-  .LOW { color:var(--low); } .MEDIUM { color:var(--med); } .HIGH { color:var(--high); }
-  .warn { color:var(--high); font-weight:600; }
+  :root {
+    --bg:#f5f6f8; --card:#ffffff; --fg:#1b2129; --muted:#5d6774; --line:#dde2e8; --soft:#eef1f5;
+    --accent:#1f5fbf; --accent-fg:#ffffff;
+    --low:#1e7a3c; --low-bg:#e5f4ea; --med:#9a5b00; --med-bg:#fbf0dc; --high:#b42318; --high-bg:#fbe7e5;
+    --real:#1e7a3c; --fake:#b42318;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#14181d; --card:#1c2128; --fg:#e6e9ed; --muted:#9aa4b0; --line:#2e353e; --soft:#242a32;
+      --accent:#5b9cff; --accent-fg:#0d1117;
+      --low:#5cc97f; --low-bg:#183323; --med:#f0b04f; --med-bg:#3a2c12; --high:#ff7b6e; --high-bg:#3d1c19;
+      --real:#5cc97f; --fake:#ff7b6e;
+    }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color:var(--fg); background:var(--bg); }
+  header { padding:20px 16px 8px; max-width:1200px; margin:0 auto; display:flex; flex-wrap:wrap; gap:8px 16px; align-items:baseline; }
+  header h1 { font-size:22px; margin:0; }
+  header p { margin:0; color:var(--muted); flex:1 1 320px; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .chip { font-size:12px; padding:2px 8px; border-radius:999px; background:var(--soft); color:var(--muted); border:1px solid var(--line); }
+  main { max-width:1200px; margin:0 auto; padding:8px 16px 32px; display:grid; grid-template-columns:minmax(0,5fr) minmax(0,7fr); gap:16px; }
+  @media (max-width: 900px) { main { grid-template-columns:1fr; } }
+  section.card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; }
+  h2 { font-size:16px; margin:0 0 12px; }
+  h3 { font-size:14px; margin:16px 0 8px; color:var(--muted); font-weight:600; }
+  .tabs { display:flex; gap:4px; border-bottom:1px solid var(--line); margin-bottom:12px; }
+  .tabs button { border:0; background:none; padding:8px 12px; color:var(--muted); font:inherit; cursor:pointer; border-bottom:2px solid transparent; }
+  .tabs button[aria-selected=true] { color:var(--fg); border-bottom-color:var(--accent); font-weight:600; }
+  .filters { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+  .filters button, .seg button { font:inherit; font-size:13px; padding:4px 10px; border-radius:999px; border:1px solid var(--line); background:var(--card); color:var(--fg); cursor:pointer; }
+  .filters button[aria-pressed=true] { background:var(--fg); color:var(--card); border-color:var(--fg); }
+  .list { display:flex; flex-direction:column; gap:8px; max-height:560px; overflow:auto; padding-right:4px; }
+  .sample { border:1px solid var(--line); border-radius:8px; padding:10px; display:grid; grid-template-columns:1fr auto; gap:6px 8px; cursor:pointer; }
+  .sample[aria-selected=true] { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+  .sample .meta { font-size:13px; color:var(--muted); }
+  .sample audio { grid-column:1 / -1; width:100%; height:32px; }
+  .tag { display:inline-block; font-size:12px; font-weight:600; padding:1px 8px; border-radius:4px; margin-right:6px; }
+  .tag.real { color:var(--real); background:var(--low-bg); }
+  .tag.fake { color:var(--fake); background:var(--high-bg); }
+  .empty { color:var(--muted); font-size:14px; }
+  code { background:var(--soft); padding:1px 4px; border-radius:4px; font-size:13px; }
+  .drop { border:2px dashed var(--line); border-radius:10px; padding:24px; text-align:center; color:var(--muted); cursor:pointer; }
+  .drop.over { border-color:var(--accent); color:var(--fg); }
+  .channels { display:grid; grid-template-columns:repeat(auto-fill, minmax(170px, 1fr)); gap:8px; }
+  .ch { text-align:left; font:inherit; border:1px solid var(--line); border-radius:8px; padding:8px 10px; background:var(--card); color:var(--fg); cursor:pointer; }
+  .ch strong { display:block; font-size:14px; }
+  .ch span { font-size:12px; color:var(--muted); }
+  .ch[aria-pressed=true] { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+  .ch:disabled { opacity:.45; cursor:not-allowed; }
+  .actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; align-items:center; }
+  .btn { font:inherit; font-weight:600; padding:9px 16px; border-radius:8px; border:1px solid var(--accent); cursor:pointer; }
+  .btn.primary { background:var(--accent); color:var(--accent-fg); }
+  .btn.secondary { background:var(--card); color:var(--accent); }
+  .btn:disabled { opacity:.5; cursor:not-allowed; }
+  .picked { font-size:13px; color:var(--muted); }
+  details { margin-top:12px; font-size:14px; }
+  details label { display:block; margin:8px 0 4px; font-weight:600; }
+  select, input[type=text] { font:inherit; padding:6px 8px; border:1px solid var(--line); border-radius:6px; background:var(--card); color:var(--fg); width:100%; }
+  .verdict { display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px; padding:12px; border-radius:8px; margin-bottom:12px; }
+  .verdict.LOW { background:var(--low-bg); } .verdict.MEDIUM { background:var(--med-bg); } .verdict.HIGH { background:var(--high-bg); }
+  .verdict .level { font-size:20px; font-weight:700; }
+  .LOW .level, td.LOW { color:var(--low); } .MEDIUM .level, td.MEDIUM { color:var(--med); } .HIGH .level, td.HIGH { color:var(--high); }
+  .verdict .action { flex:1 1 260px; }
+  .truth { font-size:14px; margin:0 0 10px; }
+  .ok { color:var(--low); font-weight:600; } .miss { color:var(--high); font-weight:600; }
+  .warn { color:var(--high); font-weight:600; font-size:14px; }
+  .facts { display:flex; flex-wrap:wrap; gap:6px 18px; font-size:13px; color:var(--muted); margin:8px 0; }
+  .facts b { color:var(--fg); font-weight:600; }
+  svg text { fill:var(--muted); font-size:11px; }
   table { border-collapse:collapse; width:100%; font-size:14px; }
-  th, td { border-bottom:1px solid var(--line); padding:4px 8px; text-align:right; }
-  th:first-child, td:first-child { text-align:left; }
-  .bar { height:8px; background:var(--line); border-radius:4px; overflow:hidden; }
-  .bar > span { display:block; height:100%; }
+  th, td { border-bottom:1px solid var(--line); padding:6px 8px; text-align:right; }
+  th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align:left; }
+  th { color:var(--muted); font-weight:600; }
+  .note { font-size:12px; color:var(--muted); margin-top:8px; }
+  .spin { display:inline-block; width:14px; height:14px; border:2px solid var(--line); border-top-color:var(--accent); border-radius:50%; animation:r 0.8s linear infinite; vertical-align:-2px; margin-right:6px; }
+  @keyframes r { to { transform:rotate(360deg); } }
+  .rec { display:flex; align-items:center; gap:12px; }
+  .rec .dot { width:10px; height:10px; border-radius:50%; background:var(--high); visibility:hidden; }
+  .rec.on .dot { visibility:visible; animation:b 1s infinite; }
+  @keyframes b { 50% { opacity:.2; } }
 </style>
 </head>
 <body>
-<main>
+<header>
   <h1>VoiceGuard</h1>
-  <p class="sub">Giám định giọng nói nhân bản cho kênh thoại doanh nghiệp (Nes2Net-X, XLS-R 300M)</p>
-  <form id="f">
-    <label for="file">Tệp âm thanh (wav, flac, mp3, ogg...)</label>
-    <input id="file" name="file" type="file" accept="audio/*" required>
-    <label for="mode">Chế độ</label>
-    <select id="mode" name="mode">
-      <option value="window">Cửa sổ trượt 4 s (sàng lọc cuộc gọi)</option>
-      <option value="full">Toàn bộ tệp (giao thức benchmark)</option>
-    </select>
-    <label for="channel">Mô phỏng kênh truyền</label>
-    <select id="channel" name="channel"></select>
-    <label for="caller_number">Số gọi đến (tùy chọn, dùng cho lớp lọc)</label>
-    <input id="caller_number" name="caller_number" type="text" inputmode="tel" style="width:100%">
+  <p>Giám định giọng nói nhân bản trên kênh thoại doanh nghiệp</p>
+  <div class="chips" id="modelChips"></div>
+</header>
+<main>
+  <section class="card" aria-labelledby="srcTitle">
+    <h2 id="srcTitle">Âm thanh cần kiểm tra</h2>
+    <div class="tabs" role="tablist">
+      <button role="tab" aria-selected="true" data-tab="lib">Thư viện mẫu</button>
+      <button role="tab" aria-selected="false" data-tab="up">Tải tệp</button>
+      <button role="tab" aria-selected="false" data-tab="rec">Ghi âm</button>
+    </div>
+    <div data-panel="lib">
+      <div class="filters" id="dsFilter"></div>
+      <div class="filters" id="labFilter"></div>
+      <div class="list" id="sampleList"></div>
+    </div>
+    <div data-panel="up" hidden>
+      <label class="drop" id="drop">Kéo thả tệp âm thanh vào đây hoặc bấm để chọn (wav, flac, mp3, ogg, m4a...)
+        <input id="file" type="file" accept="audio/*" hidden>
+      </label>
+      <audio id="upPreview" controls hidden style="width:100%;margin-top:10px"></audio>
+    </div>
+    <div data-panel="rec" hidden>
+      <div class="rec" id="recBox">
+        <button class="btn secondary" id="recBtn">Bắt đầu ghi</button><span class="dot"></span><span id="recTime">0.0 s</span>
+      </div>
+      <p class="note">Nói ít nhất 4 giây. Âm thanh chỉ được gửi tới máy chủ VoiceGuard để phân tích và không được lưu.</p>
+      <audio id="recPreview" controls hidden style="width:100%;margin-top:10px"></audio>
+    </div>
+  </section>
 
-    <button type="submit">Phân tích</button>
-  </form>
-  <section id="out" hidden></section>
+  <section class="card" aria-labelledby="chTitle">
+    <h2 id="chTitle">Kênh truyền mô phỏng</h2>
+    <div class="channels" id="channels"></div>
+    <details>
+      <summary>Tùy chọn nâng cao</summary>
+      <label for="mode">Chế độ phân tích</label>
+      <select id="mode">
+        <option value="window">Cửa sổ trượt 4 s, bước 2 s (sàng lọc cuộc gọi)</option>
+        <option value="full">Toàn bộ tệp một lần (giao thức benchmark)</option>
+      </select>
+      <label for="caller">Số gọi đến (lớp lọc theo số)</label>
+      <input id="caller" type="text" inputmode="tel" placeholder="Bỏ trống nếu không có">
+    </details>
+    <div class="actions">
+      <button class="btn primary" id="analyze" disabled>Phân tích</button>
+      <button class="btn secondary" id="compare" disabled>So sánh qua các kênh</button>
+      <span class="picked" id="picked">Chưa chọn âm thanh</span>
+    </div>
+    <div id="out"></div>
+  </section>
 </main>
 <script>
-const names = {none:"Không (âm thanh gốc)", nb8k:"Băng hẹp 8 kHz", g711u:"G.711 μ-law", g711a:"G.711 A-law",
-               gsm:"GSM 06.10", g722:"G.722", opus12:"Opus 12 kbit/s", mp3_32:"MP3 32 kbit/s"};
-fetch("/health").then(r => r.json()).then(h => {
-  const sel = document.getElementById("channel");
-  for (const c of h.channels) sel.add(new Option(names[c] || c, c));
+const CH = {
+  none:   {name:"Âm thanh gốc", app:"Tệp ghi âm 16 kHz"},
+  g711u:  {name:"G.711 μ-law", app:"Tổng đài, điện thoại cố định"},
+  g711a:  {name:"G.711 A-law", app:"Tổng đài châu Âu, châu Á"},
+  nb8k:   {name:"Băng hẹp 8 kHz", app:"Chỉ giới hạn băng tần"},
+  gsm:    {name:"GSM 06.10", app:"Di động 2G"},
+  amrnb:  {name:"AMR-NB 12.2 kbit/s", app:"Di động 3G, 4G"},
+  amrwb:  {name:"AMR-WB 12.65 kbit/s", app:"VoLTE, thoại HD"},
+  g722:   {name:"G.722", app:"Tổng đài IP HD"},
+  opus12: {name:"Opus 12 kbit/s", app:"Zalo, Messenger"},
+  mp3_32: {name:"MP3 32 kbit/s", app:"Tin nhắn thoại"},
+};
+const COMPARE = ["none", "g711u", "gsm", "amrnb", "amrwb", "opus12", "mp3_32"];
+const LEVEL = {LOW:"Rủi ro thấp", MEDIUM:"Rủi ro trung bình", HIGH:"Rủi ro cao"};
+const $ = id => document.getElementById(id);
+let health = null, samples = [], current = null, channel = "none", dsSel = "all", labSel = "all";
+
+function esc(s) { return String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+// ---------- tabs ----------
+document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
+  document.querySelectorAll(".tabs button").forEach(x => x.setAttribute("aria-selected", x === b));
+  document.querySelectorAll("[data-panel]").forEach(p => p.hidden = p.dataset.panel !== b.dataset.tab);
 });
-document.getElementById("f").addEventListener("submit", async ev => {
-  ev.preventDefault();
-  const out = document.getElementById("out");
-  out.hidden = false; out.textContent = "Đang phân tích...";
-  const r = await fetch("/v1/analyze", {method:"POST", body:new FormData(ev.target)});
-  const d = await r.json();
-  if (!r.ok) { out.innerHTML = `<p class="warn">Lỗi: ${d.detail}</p>`; return; }
-  if (d.screened_by === "prefilter") {
-    out.innerHTML = `<p class="risk HIGH">Mức rủi ro: HIGH</p><p>${d.recommended_action}</p>
-      <p>Cuộc gọi bị chặn ở lớp lọc số gọi đến, mô hình không được chạy.</p>`;
+
+// ---------- health, channels ----------
+fetch("/health").then(r => r.json()).then(h => {
+  health = h;
+  const m = h.model || {};
+  const chips = [];
+  if (m.random_weights) chips.push("Trọng số ngẫu nhiên (chỉ để thử giao diện)");
+  else chips.push(`Encoder ${m.num_layers ?? "?"} lớp`);
+  chips.push(h.device.toUpperCase() + (h.fp16 ? " · FP16" : ""));
+  chips.push(h.policy.calibrated ? "Ngưỡng đã hiệu chỉnh theo kênh" : "Ngưỡng chưa hiệu chỉnh");
+  $("modelChips").innerHTML = chips.map(c => `<span class="chip">${esc(c)}</span>`).join("");
+  $("channels").innerHTML = h.channels.map(c => {
+    const info = h.channel_info?.[c] || {}, d = CH[c] || {name:c, app:""};
+    return `<button class="ch" data-ch="${c}" aria-pressed="${c === channel}" ${info.available === false ? "disabled title='ffmpeg trên máy chủ không có encoder này'" : ""}>
+      <strong>${esc(d.name)}</strong><span>${esc(d.app)}${info.calibrated ? "" : " · ngưỡng chung"}</span></button>`;
+  }).join("");
+  document.querySelectorAll(".ch").forEach(b => b.onclick = () => {
+    channel = b.dataset.ch;
+    document.querySelectorAll(".ch").forEach(x => x.setAttribute("aria-pressed", x === b));
+  });
+});
+
+// ---------- sample library ----------
+fetch("/v1/samples").then(r => r.json()).then(list => {
+  samples = list;
+  const ds = [...new Map(list.map(s => [s.dataset, s.dataset_title])).entries()];
+  $("dsFilter").innerHTML = [["all", "Tất cả"], ...ds].map(([k, t]) =>
+    `<button data-ds="${k}" aria-pressed="${k === dsSel}">${esc(t)}</button>`).join("");
+  $("labFilter").innerHTML = [["all", "Thật và giả"], ["bonafide", "Giọng thật"], ["spoof", "Giọng giả"]].map(([k, t]) =>
+    `<button data-lab="${k}" aria-pressed="${k === labSel}">${t}</button>`).join("");
+  $("dsFilter").onclick = e => { if (e.target.dataset.ds) { dsSel = e.target.dataset.ds; renderSamples(); } };
+  $("labFilter").onclick = e => { if (e.target.dataset.lab) { labSel = e.target.dataset.lab; renderSamples(); } };
+  renderSamples();
+});
+
+function renderSamples() {
+  document.querySelectorAll("#dsFilter button").forEach(b => b.setAttribute("aria-pressed", b.dataset.ds === dsSel));
+  document.querySelectorAll("#labFilter button").forEach(b => b.setAttribute("aria-pressed", b.dataset.lab === labSel));
+  if (!samples.length) {
+    $("sampleList").innerHTML = `<p class="empty">Chưa có thư viện mẫu. Tạo bằng <code>python -m voiceguard.samples</code> từ bản sao các bộ dữ liệu trên máy (xem README), hoặc dùng thẻ Tải tệp, Ghi âm.</p>`;
     return;
   }
-  const rows = d.segments.map(s => {
-    const w = Math.round(100 * s.p_bonafide);
-    const col = s.p_bonafide >= 0.5 ? "var(--low)" : "var(--high)";
-    return `<tr><td>${s.start.toFixed(1)}–${s.end.toFixed(1)} s</td><td>${s.score.toFixed(3)}</td>
-            <td>${s.p_bonafide.toFixed(3)}</td><td style="width:35%"><div class="bar"><span style="width:${w}%;background:${col}"></span></div></td></tr>`;
-  }).join("");
-  out.innerHTML = `
-    ${d.model_random_weights ? '<p class="warn">Đang chạy trọng số ngẫu nhiên: kết quả chỉ để kiểm thử luồng xử lý.</p>' : ""}
-    ${d.policy.calibrated ? "" : '<p class="warn">Ngưỡng chưa được hiệu chỉnh.</p>'}
-    <p class="risk ${d.risk_level}">Mức rủi ro: ${d.risk_level}${d.escalated_by_prefilter ? " (nâng mức do số chưa biết)" : ""}</p>
-    <p>${d.recommended_action}</p>
-    <p>Điểm tổng hợp ${d.score} · thời lượng ${d.duration_s} s · ${d.n_segments} đoạn ·
-       suy luận ${d.timing_ms.model} ms (RTF ${d.timing_ms.rtf}) · kênh ${names[d.channel_simulated]}</p>
-    <table><thead><tr><th>Đoạn</th><th>Điểm</th><th>P(thật)</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
-});
+  const rows = samples.filter(s => (dsSel === "all" || s.dataset === dsSel) && (labSel === "all" || s.label === labSel));
+  $("sampleList").innerHTML = rows.map(s => `
+    <div class="sample" data-id="${s.id}" aria-selected="${current?.sample?.id === s.id}" tabindex="0">
+      <div><span class="tag ${s.label === "spoof" ? "fake" : "real"}">${s.label === "spoof" ? "Giả" : "Thật"}</span>
+        <b>${esc(s.dataset_title)}</b>
+        <div class="meta">${esc(s.detail || s.original)} · ${s.duration_s.toFixed(1)} s</div></div>
+      <button class="btn secondary" style="padding:4px 10px">Chọn</button>
+      <audio controls preload="none" src="/samples/${encodeURIComponent(s.file)}"></audio>
+    </div>`).join("") || `<p class="empty">Không có mẫu nào khớp bộ lọc.</p>`;
+  document.querySelectorAll(".sample").forEach(el => {
+    const pick = () => selectSample(samples.find(s => s.id === el.dataset.id));
+    el.querySelector("button").onclick = e => { e.stopPropagation(); pick(); };
+    el.onkeydown = e => { if (e.key === "Enter") pick(); };
+  });
+}
+
+async function selectSample(s) {
+  const blob = await (await fetch(`/samples/${encodeURIComponent(s.file)}`)).blob();
+  setCurrent({blob, name:s.file, sample:s}, `${s.label === "spoof" ? "Giả" : "Thật"} · ${s.dataset_title} · ${s.detail || s.original}`);
+  renderSamples();
+}
+
+function setCurrent(c, label) {
+  current = c;
+  $("picked").textContent = "Đã chọn: " + label;
+  $("analyze").disabled = $("compare").disabled = false;
+}
+
+// ---------- upload ----------
+const drop = $("drop");
+$("file").onchange = () => useFile($("file").files[0]);
+drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
+drop.ondragleave = () => drop.classList.remove("over");
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); useFile(e.dataTransfer.files[0]); };
+function useFile(f) {
+  if (!f) return;
+  $("upPreview").src = URL.createObjectURL(f); $("upPreview").hidden = false;
+  setCurrent({blob:f, name:f.name}, f.name);
+}
+
+// ---------- record ----------
+let rec = null, chunks = [], t0 = 0, timer = null;
+$("recBtn").onclick = async () => {
+  if (rec) { rec.stop(); return; }
+  let stream;
+  try { stream = await navigator.mediaDevices.getUserMedia({audio:true}); }
+  catch { $("recTime").textContent = "Trình duyệt không cho phép dùng micro"; return; }
+  chunks = []; rec = new MediaRecorder(stream);
+  rec.ondataavailable = e => chunks.push(e.data);
+  rec.onstop = () => {
+    stream.getTracks().forEach(t => t.stop()); clearInterval(timer);
+    $("recBox").classList.remove("on"); $("recBtn").textContent = "Ghi lại";
+    const blob = new Blob(chunks, {type:rec.mimeType}); rec = null;
+    $("recPreview").src = URL.createObjectURL(blob); $("recPreview").hidden = false;
+    const ext = blob.type.includes("ogg") ? "ogg" : blob.type.includes("mp4") ? "m4a" : "webm";
+    setCurrent({blob, name:`ghi-am.${ext}`}, `Ghi âm ${$("recTime").textContent}`);
+  };
+  rec.start(); t0 = Date.now(); $("recBox").classList.add("on"); $("recBtn").textContent = "Dừng";
+  timer = setInterval(() => $("recTime").textContent = ((Date.now() - t0) / 1000).toFixed(1) + " s", 100);
+};
+
+// ---------- analysis ----------
+async function analyze(ch) {
+  const fd = new FormData();
+  fd.append("file", current.blob, current.name);
+  fd.append("mode", $("mode").value);
+  fd.append("channel", ch);
+  fd.append("caller_number", $("caller").value);
+  const r = await fetch("/v1/analyze", {method:"POST", body:fd});
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.detail || r.statusText);
+  return d;
+}
+
+function truthLine(d) {
+  const s = current.sample;
+  if (!s || !d.risk_level) return "";
+  const flagged = d.risk_level !== "LOW";
+  const ok = (s.label === "spoof") === flagged;
+  return `<p class="truth">Nhãn của mẫu: <b>${s.label === "spoof" ? "giọng giả" : "giọng thật"}</b>${s.detail ? " (" + esc(s.detail) + ")" : ""} ·
+    hệ thống ${flagged ? "cảnh báo" : "cho qua"} · <span class="${ok ? "ok" : "miss"}">${ok ? "đúng" : "sai"}</span></p>`;
+}
+
+function scaleSvg(score, p) {
+  const lo = Math.min(-12, Math.floor(score) - 1), hi = Math.max(8, Math.ceil(score) + 1), W = 600, H = 58;
+  const x = v => 10 + (v - lo) / (hi - lo) * (W - 20);
+  const zone = (a, b, cls) => `<rect x="${x(a)}" y="18" width="${x(b) - x(a)}" height="14" style="fill:var(--${cls}-bg)"/>`;
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Điểm ${score.toFixed(2)} so với hai ngưỡng">
+    ${zone(lo, p.t_high, "high")}${zone(p.t_high, p.t_medium, "med")}${zone(p.t_medium, hi, "low")}
+    <line x1="${x(p.t_high)}" x2="${x(p.t_high)}" y1="14" y2="36" stroke="var(--high)" stroke-width="1.5"/>
+    <line x1="${x(p.t_medium)}" x2="${x(p.t_medium)}" y1="14" y2="36" stroke="var(--med)" stroke-width="1.5"/>
+    <text x="${x(p.t_high)}" y="50" text-anchor="middle">ngưỡng cao ${p.t_high.toFixed(2)}</text>
+    <text x="${x(p.t_medium)}" y="10" text-anchor="middle">ngưỡng trung bình ${p.t_medium.toFixed(2)}</text>
+    <line x1="${x(score)}" x2="${x(score)}" y1="12" y2="38" stroke="var(--fg)" stroke-width="3"/>
+    <circle cx="${x(score)}" cy="25" r="5" style="fill:var(--fg)"/>
+    <text x="10" y="50">← giống giả</text><text x="${W - 10}" y="50" text-anchor="end">giống thật →</text>
+  </svg>`;
+}
+
+function timelineSvg(segs, p) {
+  if (segs.length < 2) return "";
+  const W = 600, H = 150, L = 40, R = 10, T = 10, B = 26;
+  const t1 = Math.max(...segs.map(s => s.end));
+  const vals = segs.map(s => s.score).concat([p.t_high, p.t_medium]);
+  const lo = Math.min(...vals) - 1, hi = Math.max(...vals) + 1;
+  const x = t => L + t / t1 * (W - L - R), y = v => T + (hi - v) / (hi - lo) * (H - T - B);
+  const lvl = v => v < p.t_high ? "high" : v < p.t_medium ? "med" : "low";
+  const pts = segs.map(s => [x((s.start + s.end) / 2), y(s.score), s]);
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Điểm theo từng cửa sổ 4 giây">
+    <line x1="${L}" x2="${W - R}" y1="${y(p.t_high)}" y2="${y(p.t_high)}" stroke="var(--high)" stroke-dasharray="4 3"/>
+    <line x1="${L}" x2="${W - R}" y1="${y(p.t_medium)}" y2="${y(p.t_medium)}" stroke="var(--med)" stroke-dasharray="4 3"/>
+    <polyline points="${pts.map(q => q[0] + "," + q[1]).join(" ")}" fill="none" stroke="var(--muted)" stroke-width="2"/>
+    ${pts.map(([cx, cy, s]) => `<circle cx="${cx}" cy="${cy}" r="5" style="fill:var(--${lvl(s.score)})" stroke="var(--card)" stroke-width="2">
+      <title>${s.start.toFixed(1)}–${s.end.toFixed(1)} s: điểm ${s.score.toFixed(2)}</title></circle>`).join("")}
+    <line x1="${L}" x2="${W - R}" y1="${H - B}" y2="${H - B}" stroke="var(--line)"/>
+    <text x="${L}" y="${H - 8}">0 s</text><text x="${W - R}" y="${H - 8}" text-anchor="end">${t1.toFixed(1)} s</text>
+    <text x="${L - 6}" y="${y(hi - 1) + 4}" text-anchor="end">${(hi - 1).toFixed(0)}</text>
+    <text x="${L - 6}" y="${y(lo + 1) + 4}" text-anchor="end">${(lo + 1).toFixed(0)}</text>
+  </svg>`;
+}
+
+function render(d) {
+  if (d.screened_by === "prefilter") {
+    $("out").innerHTML = `<h3>Kết quả</h3><div class="verdict HIGH"><span class="level">⛔ ${LEVEL.HIGH}</span>
+      <span class="action">${esc(d.recommended_action)}</span></div><p>Số gọi đến nằm trong blacklist, mô hình không được chạy.</p>`;
+    return;
+  }
+  const icon = {LOW:"✓", MEDIUM:"!", HIGH:"⛔"}[d.risk_level];
+  const segRows = d.segments.map(s => `<tr><td>${s.start.toFixed(1)}–${s.end.toFixed(1)} s</td><td></td>
+      <td>${s.score.toFixed(3)}</td><td>${s.p_bonafide.toFixed(3)}</td></tr>`).join("");
+  $("out").innerHTML = `<h3>Kết quả trên kênh ${esc(CH[d.channel_simulated]?.name || d.channel_simulated)}</h3>
+    ${d.model_random_weights ? '<p class="warn">Trọng số ngẫu nhiên: kết quả chỉ để kiểm thử giao diện.</p>' : ""}
+    <div class="verdict ${d.risk_level}"><span class="level">${icon} ${LEVEL[d.risk_level]}</span>
+      <span class="action">${esc(d.recommended_action)}${d.escalated_by_prefilter ? " (nâng mức do số gọi đến chưa đăng ký)" : ""}</span></div>
+    ${truthLine(d)}
+    ${scaleSvg(d.score, d.policy)}
+    <div class="facts"><span>Điểm tổng hợp <b>${d.score.toFixed(2)}</b></span><span>Thời lượng <b>${d.duration_s} s</b></span>
+      <span>${d.n_segments} cửa sổ</span><span>Suy luận <b>${d.timing_ms.model} ms</b></span><span>RTF <b>${d.timing_ms.rtf}</b></span></div>
+    ${timelineSvg(d.segments, d.policy)}
+    <details><summary>Điểm từng cửa sổ</summary><table><thead><tr><th>Cửa sổ</th><th></th><th>Điểm</th><th>P(thật)</th></tr></thead>
+      <tbody>${segRows}</tbody></table></details>
+    <p class="note">Ngưỡng: ${esc(d.policy.source)}</p>`;
+}
+
+$("analyze").onclick = async () => {
+  $("analyze").disabled = true;
+  $("out").innerHTML = `<p><span class="spin"></span>Đang phân tích...</p>`;
+  try { render(await analyze(channel)); }
+  catch (e) { $("out").innerHTML = `<p class="warn">Lỗi: ${esc(e.message)}</p>`; }
+  $("analyze").disabled = false;
+};
+
+$("compare").onclick = async () => {
+  $("compare").disabled = true;
+  const chans = COMPARE.filter(c => health?.channel_info?.[c]?.available !== false);
+  const rows = [];
+  for (const [i, c] of chans.entries()) {
+    $("out").innerHTML = `<p><span class="spin"></span>Đang phân tích kênh ${i + 1}/${chans.length}: ${esc(CH[c].name)}</p>`;
+    try { rows.push([c, await analyze(c)]); } catch (e) { rows.push([c, {error:e.message}]); }
+  }
+  const s = current.sample;
+  $("out").innerHTML = `<h3>Cùng một âm thanh qua các kênh</h3>
+    ${s ? `<p class="truth">Nhãn của mẫu: <b>${s.label === "spoof" ? "giọng giả" : "giọng thật"}</b></p>` : ""}
+    <table><thead><tr><th>Kênh</th><th>Ví dụ</th><th>Điểm</th><th>Mức rủi ro</th>${s ? "<th>Đúng nhãn</th>" : ""}</tr></thead><tbody>
+    ${rows.map(([c, d]) => d.error ? `<tr><td>${esc(CH[c].name)}</td><td>${esc(CH[c].app)}</td><td colspan="${s ? 3 : 2}" class="HIGH">${esc(d.error)}</td></tr>` :
+      `<tr><td>${esc(CH[c].name)}</td><td>${esc(CH[c].app)}</td><td>${d.score?.toFixed(2) ?? "–"}</td>
+       <td class="${d.risk_level}">${LEVEL[d.risk_level]}</td>
+       ${s ? `<td>${(s.label === "spoof") === (d.risk_level !== "LOW") ? '<span class="ok">đúng</span>' : '<span class="miss">sai</span>'}</td>` : ""}</tr>`).join("")}
+    </tbody></table>
+    <p class="note">Mỗi kênh dùng ngưỡng hiệu chỉnh riêng của kênh đó. Codec được mô phỏng trên máy chủ bằng ffmpeg.</p>`;
+  $("compare").disabled = false;
+};
 </script>
 </body>
 </html>

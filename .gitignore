@@ -7,3 +7,4 @@ results/scores/
 results/*.json
 data/
 datasets/*_labels.txt
+samples/

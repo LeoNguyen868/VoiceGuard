@@ -80,21 +80,31 @@ def encode_decode(wav, enc, dec_in):
     return np.frombuffer(decoded, dtype=np.float32).copy()
 
 
+_AVAILABLE = None
+
+
+def available_channels():
+    """{name: True/False}: which channels this ffmpeg can run (one second of a tone each, cached)."""
+    global _AVAILABLE
+    if _AVAILABLE is None:
+        t = np.arange(SR, dtype=np.float32) / SR
+        tone = (0.3 * np.sin(2 * np.pi * 440 * t)).astype(np.float32)
+        _AVAILABLE = {}
+        for name in CHANNELS:
+            try:
+                apply_channel(tone, name)
+                _AVAILABLE[name] = True
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                _AVAILABLE[name] = False
+    return _AVAILABLE
+
+
 def check_channels():
-    """Pass one second of a tone through every channel; report which ones this ffmpeg can run."""
-    t = np.arange(SR, dtype=np.float32) / SR
-    tone = (0.3 * np.sin(2 * np.pi * 440 * t)).astype(np.float32)
-    ok = True
+    """Print which channels this ffmpeg can run; True if all of them."""
+    ok = available_channels()
     for name, (_, _, desc) in CHANNELS.items():
-        try:
-            out = apply_channel(tone, name)
-            status = f"OK ({len(out) / SR:.2f} s back)"
-        except (subprocess.CalledProcessError, FileNotFoundError) as e:
-            ok = False
-            err = getattr(e, "stderr", b"") or b""
-            status = "FAILED: " + (err.decode(errors="replace").strip().splitlines() or [str(e)])[-1]
-        print(f"{name:8s} {desc:55s} {status}")
-    return ok
+        print(f"{name:8s} {desc:55s} {'OK' if ok[name] else 'FAILED (encoder not in this ffmpeg)'}")
+    return all(ok.values())
 
 
 if __name__ == "__main__":

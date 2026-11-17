@@ -6,6 +6,10 @@ Environment variables:
                  VG_RANDOM=tiny uses the ~2 M parameter variant (tests on weak machines)
   VG_POLICY      calibration JSON with t_high / t_medium; default configs/policy/L14_clean_4s.json
                  when the default 14-layer checkpoint is used
+  VG_POLICY_DIR  folder of per-channel thresholds <VG_POLICY_PREFIX><channel>_4s.json (channel 'none' is
+                 'clean'); a request on a channel without a file uses VG_POLICY. Default configs/policy with
+                 prefix L14_ when the default 14-layer checkpoint is used
+  VG_SAMPLES     folder with manifest.json and sample audio for the web interface (default samples/)
   VG_DEVICE      cpu | cuda (default: cuda if available)
   VG_FP16=1      FP16 autocast on GPU
   VG_REGISTERED  text file of registered customer numbers, one per line (pre-filter)
@@ -36,10 +40,11 @@ import torch
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from .audio import SR, load_audio, repeat_pad, rms_dbfs
 from .batcher import WindowBatcher
-from .channel import CHANNELS, apply_channel
+from .channel import CHANNELS, apply_channel, available_channels
 from .detector import MIN_RMS_DBFS, MIN_SECONDS, Detector, InsufficientAudio
 from .model import build_random_detector, load_detector
 from .policy import at_least_medium, load_policy
@@ -49,6 +54,7 @@ STATIC = Path(__file__).parent / "static"
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CKPT = ROOT / "weights" / "voiceguard_L14.pt"
 DEFAULT_POLICY = ROOT / "configs" / "policy" / "L14_clean_4s.json"
+SAMPLES = Path(os.environ.get("VG_SAMPLES") or ROOT / "samples")
 app = FastAPI(title="VoiceGuard - examination service", version="0.2")
 _state = {}
 
@@ -69,6 +75,7 @@ def _get():
         if policy_path is None and not os.environ.get("VG_CKPT") and DEFAULT_POLICY.exists():
             policy_path = str(DEFAULT_POLICY)
         policy = load_policy(policy_path)
+        _state["channel_policies"] = _channel_policies(not os.environ.get("VG_CKPT"))
         det = Detector(model, policy, device, fp16=os.environ.get("VG_FP16") == "1",
                        cuda_graph=os.environ.get("VG_CUDA_GRAPH") == "1")
         _state["detector"] = det
@@ -81,6 +88,23 @@ def _get():
                                           max_requests=1 if os.environ.get("VG_BATCH") == "0" else None)
         _state["calls"] = {}
     return _state["detector"]
+
+
+def _channel_policies(default_ckpt):
+    """{channel: Policy} from VG_POLICY_DIR; empty when no folder is configured."""
+    folder = os.environ.get("VG_POLICY_DIR") or (str(DEFAULT_POLICY.parent) if default_ckpt else None)
+    prefix = os.environ.get("VG_POLICY_PREFIX", "L14_" if default_ckpt else "")
+    out = {}
+    if folder:
+        for ch in CHANNELS:
+            f = Path(folder) / f"{prefix}{'clean' if ch == 'none' else ch}_4s.json"
+            if f.exists():
+                out[ch] = load_policy(str(f))
+    return out
+
+
+def _policy_for(channel):
+    return _state["channel_policies"].get(channel, _state["detector"].policy)
 
 
 def _lists():
@@ -101,6 +125,19 @@ def index():
     return FileResponse(STATIC / "index.html")
 
 
+@app.get("/v1/samples")
+def samples():
+    """Sample clips for the web interface (manifest.json written by python -m voiceguard.samples)."""
+    f = SAMPLES / "manifest.json"
+    if not f.exists():
+        return []
+    return json.loads(f.read_text(encoding="utf-8"))
+
+
+if SAMPLES.is_dir():
+    app.mount("/samples", StaticFiles(directory=SAMPLES), name="samples")
+
+
 @app.get("/health")
 def health():
     det = _get()
@@ -108,6 +145,8 @@ def health():
     b = _state["batcher"]
     return dict(status="ok", device=_state["device"], fp16=det.fp16, model=_state["model_info"],
                 policy=det.policy.to_dict(), channels=list(CHANNELS),
+                channel_info={c: dict(description=CHANNELS[c][2], available=available_channels()[c],
+                                      calibrated=c in _state["channel_policies"]) for c in CHANNELS},
                 prefilter=dict(registered=len(registered), blacklist=len(blacklist)),
                 inference=dict(cuda_graph=det.graphs is not None, batch_max=b.max_batch,
                                batch_wait_ms=b.max_wait * 1000, across_requests=b.max_requests is None,
@@ -121,16 +160,19 @@ async def analyze(file: UploadFile = File(...), mode: str = Form("window"),
         raise HTTPException(422, "mode phải là 'window' hoặc 'full'")
     if channel not in CHANNELS:
         raise HTTPException(422, f"channel phải thuộc {list(CHANNELS)}")
+    if not available_channels()[channel]:
+        raise HTTPException(422, f"ffmpeg trên máy chủ không có encoder cho kênh {channel}")
     det = _get()
     data = await file.read()
     registered, blacklist = _lists()
     category = classify(caller_number, registered, blacklist)
+    policy = _policy_for(channel)
 
     if category == "blacklist":
         # Stopped by the pre-filter: the model is not run.
         result = dict(duration_s=None, mode=mode, n_segments=0, score=None, p_bonafide=None,
                       risk_level="HIGH", recommended_action=RULES["blacklist"],
-                      most_suspicious_segment=None, segments=[], policy=det.policy.to_dict(),
+                      most_suspicious_segment=None, segments=[], policy=policy.to_dict(),
                       timing_ms=dict(decode=0.0, model=0.0, rtf=None), screened_by="prefilter")
     else:
         t0 = time.perf_counter()
@@ -154,9 +196,9 @@ async def analyze(file: UploadFile = File(...), mode: str = Form("window"),
             t1 = time.perf_counter()
             spans, clips = det.windows(wav)
             logit_rows = await _state["batcher"].submit(clips)
-            result = det.result(wav, mode, spans, logit_rows, (time.perf_counter() - t1) * 1000)
+            result = det.result(wav, mode, spans, logit_rows, (time.perf_counter() - t1) * 1000, policy)
         else:
-            result = await run_in_threadpool(det.analyze, wav, mode)
+            result = await run_in_threadpool(det.analyze, wav, mode, policy)
         result["timing_ms"]["decode"] = round(decode_ms, 1)
         result["screened_by"] = "model"
         if category in ("unknown", "hidden"):

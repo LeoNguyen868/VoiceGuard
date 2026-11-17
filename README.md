@@ -48,7 +48,13 @@ python -m voiceguard.convert assemble --base weights/nes2netx_itw_vg.pt --head w
 uvicorn voiceguard.api:app --port 8000      # mở http://localhost:8000
 ```
 
-- Mặc định dùng `weights/voiceguard_L14.pt` với ngưỡng `configs/policy/L14_clean_4s.json`.
+- Mặc định dùng `weights/voiceguard_L14.pt`. Mỗi kênh dùng ngưỡng hiệu chỉnh riêng trong `configs/policy/L14_<kênh>_4s.json`; kênh chưa có tệp ngưỡng dùng ngưỡng của âm thanh gốc.
+- Giao diện web gồm:
+  - thư viện mẫu giọng thật và giả để nghe và phân tích, có nhãn để đối chiếu kết luận;
+  - tải tệp và ghi âm từ micro;
+  - chọn kênh mô phỏng kèm ví dụ ứng dụng (Zalo, Messenger: Opus; di động 3G, 4G: AMR-NB; VoLTE: AMR-WB; tổng đài: G.711);
+  - so sánh cùng một âm thanh qua các kênh;
+  - điểm từng cửa sổ 4 s so với hai ngưỡng.
 - Biến môi trường:
   - `VG_CKPT`, `VG_POLICY`: checkpoint và ngưỡng khác (ví dụ ngưỡng theo kênh `configs/policy/L14_opus12_4s.json`);
   - `VG_DEVICE`, `VG_FP16=1`, `VG_CUDA_GRAPH=1`: thiết bị và tăng tốc;
@@ -59,6 +65,20 @@ uvicorn voiceguard.api:app --port 8000      # mở http://localhost:8000
   - `POST /v1/analyze` (multipart: `file`, `mode` = `window` | `full`, `channel`, `caller_number`);
   - cuộc gọi streaming: `POST /v1/calls`, `POST /v1/calls/{id}/audio` (PCM 16-bit 16 kHz), `POST /v1/calls/{id}/end`.
 - Score là logit lớp thật: cao hơn là giống thật hơn. Audit log không lưu âm thanh và số điện thoại.
+
+## Thư viện mẫu cho giao diện
+
+Thư viện mẫu được tạo từ bản sao các bộ dữ liệu trên máy. Mỗi bộ dữ liệu lấy ngẫu nhiên với seed cố định một số đoạn thật và giả, không chọn theo điểm, nên thư viện có cả những đoạn mô hình đoán sai:
+
+```bash
+python -m voiceguard.samples --out samples --n 4 \
+    --itw $ITW --itw_labels $ITW/meta.csv \
+    --asv5 $ASV5 --asv5_protocol $ASV5_PROTOCOL \
+    --sea $SEA/flac --sea_systems $SEA/systems.txt \
+    --own my_clips --own_labels my_clips/labels.txt   # tùy chọn: mẫu tự thu, mỗi dòng "tên bonafide|spoof [hệ thống]"
+```
+
+`samples/` không được đưa vào git: SEA-Spoof chỉ dùng cho học thuật và không được phân phối lại. Đặt `VG_SAMPLES` nếu thư viện nằm ở chỗ khác.
 
 ## Tái lập kết quả
 

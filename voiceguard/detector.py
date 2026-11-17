@@ -52,7 +52,7 @@ class Detector:
         if level < MIN_RMS_DBFS:
             raise InsufficientAudio(f"tín hiệu quá nhỏ ({level:.1f} dBFS)")
 
-    def analyze(self, wav, mode="window"):
+    def analyze(self, wav, mode="window", policy=None):
         """mode='window': sliding windows, mean of window scores (call screening).
         mode='full': one pass over the whole clip (the benchmark protocol)."""
         self.check(wav)
@@ -67,9 +67,9 @@ class Detector:
             logit_rows = np.concatenate([self.logits(clips[i:i + self.batch_size])
                                          for i in range(0, len(clips), self.batch_size)])
         model_ms = (time.perf_counter() - t0) * 1000
-        return self.result(wav, mode, spans, logit_rows, model_ms)
+        return self.result(wav, mode, spans, logit_rows, model_ms, policy)
 
-    def result(self, wav, mode, spans, logit_rows, model_ms):
+    def result(self, wav, mode, spans, logit_rows, model_ms, policy=None):
         """Per-window scores, mean score, risk level. Shared by analyze() and the batched API path."""
         scores = logit_rows[:, 1]
         p_bona = _softmax(logit_rows)[:, 1]
@@ -77,14 +77,15 @@ class Detector:
                          p_bonafide=round(float(p), 4))
                     for (s, e), sc, p in zip(spans, scores, p_bona)]
         score = float(np.mean(scores))
-        level, action = self.policy.decide(score)
+        policy = policy or self.policy
+        level, action = policy.decide(score)
         worst = int(np.argmin(scores))
         return dict(
             duration_s=round(len(wav) / SR, 2), mode=mode, n_segments=len(segments),
             score=round(score, 4), p_bonafide=round(float(np.mean(p_bona)), 4),
             risk_level=level, recommended_action=action,
             most_suspicious_segment=segments[worst], segments=segments,
-            policy=self.policy.to_dict(),
+            policy=policy.to_dict(),
             timing_ms=dict(model=round(model_ms, 1),
                            rtf=round(model_ms / 1000 / (len(wav) / SR), 4)),
         )

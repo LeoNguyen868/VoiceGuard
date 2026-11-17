@@ -1,0 +1,5 @@
+{
+  "t_high": -8.102656249999999,
+  "t_medium": -2.527304687499999,
+  "source": "control_L14_head, In-the-Wild, kênh nb8k, window 4 s, 31779 tệp; t_medium ở FRR 7%, t_high ở FRR 1%"
+}

@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pt
+!weights/L14_head.pt
+logs/
+results/scores/
+results/*.json
+data/
+datasets/*_labels.txt

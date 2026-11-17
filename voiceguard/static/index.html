@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VoiceGuard</title>
+<style>
+  :root { --fg:#1d232a; --muted:#5b6672; --bg:#f6f7f9; --card:#fff; --line:#d9dee4;
+          --low:#2e7d32; --med:#b26a00; --high:#c62828; }
+  body { margin:0; font:15px/1.5 system-ui, sans-serif; color:var(--fg); background:var(--bg); }
+  main { max-width:860px; margin:0 auto; padding:24px 16px; }
+  h1 { font-size:22px; margin:0 0 4px; }
+  p.sub { color:var(--muted); margin:0 0 20px; }
+  form, section { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px; margin-bottom:16px; }
+  label { display:block; margin:8px 0 4px; font-weight:600; }
+  select, input[type=file] { width:100%; }
+  button { margin-top:12px; padding:8px 16px; border:0; border-radius:6px; background:#1f5fbf; color:#fff; font-weight:600; cursor:pointer; }
+  .risk { font-size:20px; font-weight:700; }
+  .LOW { color:var(--low); } .MEDIUM { color:var(--med); } .HIGH { color:var(--high); }
+  .warn { color:var(--high); font-weight:600; }
+  table { border-collapse:collapse; width:100%; font-size:14px; }
+  th, td { border-bottom:1px solid var(--line); padding:4px 8px; text-align:right; }
+  th:first-child, td:first-child { text-align:left; }
+  .bar { height:8px; background:var(--line); border-radius:4px; overflow:hidden; }
+  .bar > span { display:block; height:100%; }
+</style>
+</head>
+<body>
+<main>
+  <h1>VoiceGuard</h1>
+  <p class="sub">Giám định giọng nói nhân bản cho kênh thoại doanh nghiệp (Nes2Net-X, XLS-R 300M)</p>
+  <form id="f">
+    <label for="file">Tệp âm thanh (wav, flac, mp3, ogg...)</label>
+    <input id="file" name="file" type="file" accept="audio/*" required>
+    <label for="mode">Chế độ</label>
+    <select id="mode" name="mode">
+      <option value="window">Cửa sổ trượt 4 s (sàng lọc cuộc gọi)</option>
+      <option value="full">Toàn bộ tệp (giao thức benchmark)</option>
+    </select>
+    <label for="channel">Mô phỏng kênh truyền</label>
+    <select id="channel" name="channel"></select>
+    <label for="caller_number">Số gọi đến (tùy chọn, dùng cho lớp lọc)</label>
+    <input id="caller_number" name="caller_number" type="text" inputmode="tel" style="width:100%">
+
+    <button type="submit">Phân tích</button>
+  </form>
+  <section id="out" hidden></section>
+</main>
+<script>
+const names = {none:"Không (âm thanh gốc)", nb8k:"Băng hẹp 8 kHz", g711u:"G.711 μ-law", g711a:"G.711 A-law",
+               gsm:"GSM 06.10", g722:"G.722", opus12:"Opus 12 kbit/s", mp3_32:"MP3 32 kbit/s"};
+fetch("/health").then(r => r.json()).then(h => {
+  const sel = document.getElementById("channel");
+  for (const c of h.channels) sel.add(new Option(names[c] || c, c));
+});
+document.getElementById("f").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const out = document.getElementById("out");
+  out.hidden = false; out.textContent = "Đang phân tích...";
+  const r = await fetch("/v1/analyze", {method:"POST", body:new FormData(ev.target)});
+  const d = await r.json();
+  if (!r.ok) { out.innerHTML = `<p class="warn">Lỗi: ${d.detail}</p>`; return; }
+  if (d.screened_by === "prefilter") {
+    out.innerHTML = `<p class="risk HIGH">Mức rủi ro: HIGH</p><p>${d.recommended_action}</p>
+      <p>Cuộc gọi bị chặn ở lớp lọc số gọi đến, mô hình không được chạy.</p>`;
+    return;
+  }
+  const rows = d.segments.map(s => {
+    const w = Math.round(100 * s.p_bonafide);
+    const col = s.p_bonafide >= 0.5 ? "var(--low)" : "var(--high)";
+    return `<tr><td>${s.start.toFixed(1)}–${s.end.toFixed(1)} s</td><td>${s.score.toFixed(3)}</td>
+            <td>${s.p_bonafide.toFixed(3)}</td><td style="width:35%"><div class="bar"><span style="width:${w}%;background:${col}"></span></div></td></tr>`;
+  }).join("");
+  out.innerHTML = `
+    ${d.model_random_weights ? '<p class="warn">Đang chạy trọng số ngẫu nhiên: kết quả chỉ để kiểm thử luồng xử lý.</p>' : ""}
+    ${d.policy.calibrated ? "" : '<p class="warn">Ngưỡng chưa được hiệu chỉnh.</p>'}
+    <p class="risk ${d.risk_level}">Mức rủi ro: ${d.risk_level}${d.escalated_by_prefilter ? " (nâng mức do số chưa biết)" : ""}</p>
+    <p>${d.recommended_action}</p>
+    <p>Điểm tổng hợp ${d.score} · thời lượng ${d.duration_s} s · ${d.n_segments} đoạn ·
+       suy luận ${d.timing_ms.model} ms (RTF ${d.timing_ms.rtf}) · kênh ${names[d.channel_simulated]}</p>
+    <table><thead><tr><th>Đoạn</th><th>Điểm</th><th>P(thật)</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+});
+</script>
+</body>
+</html>

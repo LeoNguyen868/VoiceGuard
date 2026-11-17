@@ -1,0 +1,12 @@
+# CPU: pip install torch --index-url https://download.pytorch.org/whl/cpu
+# GPU: pip install torch --index-url https://download.pytorch.org/whl/cu128
+torch>=2.4
+transformers>=4.45,<5
+librosa>=0.10
+soundfile>=0.12
+numpy
+scipy
+tqdm
+fastapi>=0.110
+uvicorn>=0.29
+python-multipart

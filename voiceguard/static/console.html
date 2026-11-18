@@ -4,128 +4,142 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>VoiceGuard – Bảng điều khiển</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
 <style>
+  /* Phong cách theo CRM của doanh nghiệp: Roboto, xanh navy chủ đạo, cam cho hành động, nền xám nhạt, bảng kẻ mảnh. */
   :root {
-    --bg:#f4f6f8; --card:#ffffff; --fg:#141a22; --muted:#5b6573; --line:#e2e6eb; --soft:#eef1f4; --side:#0f1720; --side-fg:#c9d1db;
-    --accent:#2457c5; --accent-fg:#fff; --accent-soft:#e8eefb;
-    --ok:#1b7a3d; --ok-bg:#e6f4eb; --warn:#9a5a00; --warn-bg:#fcefd9; --bad:#b4231a; --bad-bg:#fbe6e4; --none:#8a94a3;
-    --radius:12px; --shadow:0 1px 2px rgba(20,26,34,.05), 0 6px 18px rgba(20,26,34,.06);
-  }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg:#0e1217; --card:#161b22; --fg:#e8ebef; --muted:#9aa3ae; --line:#29303a; --soft:#1d232b; --side:#0a0d11;
-      --accent:#6c9cff; --accent-fg:#0b0f14; --accent-soft:#1b2740;
-      --ok:#5fd08a; --ok-bg:#12291b; --warn:#f2b45a; --warn-bg:#32260f; --bad:#ff8579; --bad-bg:#3a1815; --shadow:none; }
+    --navy:#223671; --navy-2:#2f4a96; --navy-soft:#e9edf7; --orange:#f26526; --orange-2:#d9531a;
+    --bg:#f5f6fc; --card:#ffffff; --fg:#212529; --th:#495057; --muted:#6c757d; --line:#e9ecef; --grid:#dee2e6; --soft:#f8f9fa;
+    --ok:#198754; --ok-bg:#e8f5ee; --warn:#b26a00; --warn-bg:#fff4e0; --bad:#d63031; --bad-bg:#fdecec; --none:#adb5bd;
   }
   * { box-sizing:border-box; }
   html, body { margin:0; height:100%; background:var(--bg); color:var(--fg); overflow-x:hidden; }
-  body { font:15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; display:flex; }
+  body { font:14px/1.5 Roboto, Arial, sans-serif; display:flex; }
   button, input, select, textarea { font:inherit; color:inherit; }
-  nav { width:220px; flex:none; background:var(--side); color:var(--side-fg); display:flex; flex-direction:column; padding:18px 12px; gap:4px; }
-  nav .brand { display:flex; align-items:center; gap:10px; color:#fff; font-weight:700; font-size:18px; padding:4px 8px 18px; }
-  nav a { display:flex; align-items:center; gap:10px; color:var(--side-fg); text-decoration:none; padding:9px 10px; border-radius:8px; }
-  nav a small { display:block; font-size:12px; opacity:.6; }
-  nav a:hover { background:rgba(255,255,255,.06); }
-  nav a.on { background:rgba(255,255,255,.1); color:#fff; }
-  nav a .badge { margin-left:auto; background:var(--bad); color:#fff; border-radius:99px; font-size:12px; padding:0 7px; font-weight:700; }
-  nav .foot { margin-top:auto; font-size:12px; opacity:.7; padding:8px; }
-  nav .dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:#5fd08a; margin-right:6px; }
-  nav .dot.off { background:#ff8579; }
-  main { flex:1; min-width:0; overflow:auto; padding:24px 28px 40px; }
-  h1 { font-size:22px; margin:0; }
-  .sub { color:var(--muted); margin:2px 0 18px; }
-  .head { display:flex; align-items:flex-end; gap:12px; flex-wrap:wrap; margin-bottom:6px; }
-  .head .grow { flex:1; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); }
+  nav { width:220px; flex:none; background:#fff; border-right:1px solid var(--line); display:flex; flex-direction:column; }
+  nav .brand { color:var(--navy); font-weight:700; font-size:18px; line-height:1.3; padding:16px 14px 18px; letter-spacing:.2px; }
+  nav .brand small { display:block; font-size:12px; font-weight:500; color:var(--muted); letter-spacing:0; }
+  nav a { display:flex; align-items:center; gap:10px; color:var(--fg); text-decoration:none; padding:9px 14px; font-size:15px; }
+  nav a svg { flex:none; color:var(--th); }
+  nav a:hover { background:var(--navy-soft); }
+  nav a.on { background:var(--navy); color:#fff; } nav a.on svg { color:#fff; }
+  nav a .badge { margin-left:auto; background:var(--orange); color:#fff; border-radius:10px; font-size:12px; padding:0 7px; font-weight:700; line-height:18px; }
+  nav .foot { margin-top:auto; font-size:12px; color:var(--muted); padding:12px 14px; border-top:1px solid var(--line); }
+  nav .dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--ok); margin-right:6px; }
+  nav .dot.off { background:var(--bad); }
+  .shell { flex:1; min-width:0; display:flex; flex-direction:column; }
+  .topbar { height:56px; flex:none; background:#fff; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:12px; padding:0 20px; }
+  .topbar h1 { font-size:18px; font-weight:500; color:var(--navy); margin:0; }
+  .topbar .grow { flex:1; }
+  .topbar .clock { color:var(--muted); font-variant-numeric:tabular-nums; }
+  main { flex:1; min-width:0; overflow:auto; padding:16px 20px 32px; }
+  .toolbar { display:flex; align-items:center; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+  .toolbar .grow { flex:1; }
+  .iconbtn { width:36px; height:36px; border:0; border-radius:4px; background:var(--orange); color:#fff; display:grid; place-items:center; cursor:pointer; }
+  .iconbtn:hover { background:var(--orange-2); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; }
   .empty { color:var(--muted); padding:28px; text-align:center; }
-  /* live calls */
-  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:12px; }
-  .call { padding:14px; cursor:pointer; border-left:5px solid var(--none); transition:box-shadow .2s; }
-  .call:hover { box-shadow:0 0 0 2px var(--accent); }
-  .call.HIGH { border-left-color:var(--bad); } .call.MEDIUM { border-left-color:var(--warn); } .call.LOW { border-left-color:var(--ok); }
-  .call.flash { animation:flash 1.2s ease-out 2; }
-  @keyframes flash { 0% { box-shadow:0 0 0 0 rgba(180,35,26,.6); } 100% { box-shadow:0 0 0 14px rgba(180,35,26,0); } }
-  .call .row { display:flex; align-items:center; gap:8px; }
-  .call .num { font-weight:700; font-variant-numeric:tabular-nums; }
-  .call .meta { font-size:13px; color:var(--muted); }
-  .call .pct { margin-left:auto; text-align:right; font-weight:800; font-size:22px; line-height:1; font-variant-numeric:tabular-nums; }
-  .call .pct small { display:block; font-size:11px; font-weight:600; color:var(--muted); }
-  .lvl { display:inline-flex; align-items:center; gap:5px; font-size:13px; font-weight:700; padding:2px 9px; border-radius:99px; background:var(--soft); color:var(--muted); white-space:nowrap; }
-  .lvl.HIGH { background:var(--bad-bg); color:var(--bad); } .lvl.MEDIUM { background:var(--warn-bg); color:var(--warn); } .lvl.LOW { background:var(--ok-bg); color:var(--ok); }
-  .chip { font-size:12px; padding:1px 8px; border-radius:99px; background:var(--soft); color:var(--muted); white-space:nowrap; }
-  .chip.blacklist, .chip.unknown, .chip.hidden { background:var(--warn-bg); color:var(--warn); }
-  .chip.blacklist { background:var(--bad-bg); color:var(--bad); }
-  .chip.act { background:var(--accent-soft); color:var(--accent); }
-  svg.spark { width:100%; height:38px; display:block; margin:8px 0 2px; }
-  .section { margin-top:26px; }
-  .section h2 { font-size:16px; margin:0 0 10px; }
-  /* tables */
-  table { border-collapse:collapse; width:100%; }
-  th, td { text-align:left; padding:9px 12px; border-bottom:1px solid var(--line); font-size:14px; vertical-align:middle; }
-  th { color:var(--muted); font-weight:600; font-size:13px; background:var(--soft); white-space:nowrap; }
+  .count { color:var(--muted); }
+  /* bảng */
   .tablewrap { overflow-x:auto; }
-  td.num { white-space:nowrap; }
-  tr.click { cursor:pointer; } tr.click:hover td { background:var(--soft); }
-  td.num { font-variant-numeric:tabular-nums; }
-  .tabs { display:flex; gap:4px; background:var(--soft); padding:4px; border-radius:10px; }
-  .tabs button { border:0; background:none; padding:6px 14px; border-radius:7px; cursor:pointer; color:var(--muted); }
-  .tabs button.on { background:var(--card); color:var(--fg); font-weight:600; box-shadow:var(--shadow); }
-  .btn { border:1px solid var(--line); background:var(--card); padding:8px 14px; border-radius:9px; cursor:pointer; font-weight:600; }
-  .btn:hover { border-color:var(--accent); }
-  .btn.primary { background:var(--accent); color:var(--accent-fg); border-color:var(--accent); }
+  table { border-collapse:collapse; width:100%; background:#fff; }
+  th, td { text-align:left; padding:4px 10px; height:40px; vertical-align:middle; border-bottom:1px solid var(--line); }
+  th + th, td + td { border-left:1px solid var(--grid); }
+  th { color:var(--th); font-weight:700; font-size:14px; white-space:nowrap; height:36px; border-bottom:1px solid var(--grid); }
+  td { font-size:13px; }
+  td.num { white-space:nowrap; font-variant-numeric:tabular-nums; }
+  tr.click { cursor:pointer; } tr.click:hover td { background:var(--navy-soft); }
+  tr.HIGH td:first-child { box-shadow:inset 3px 0 0 var(--bad); } tr.MEDIUM td:first-child { box-shadow:inset 3px 0 0 var(--warn); }
+  tr.HIGH td { background:#fff7f7; }
+  tr.flash td { animation:flash 1.2s ease-out 2; }
+  @keyframes flash { 0% { background:#ffd9d9; } 100% { background:#fff7f7; } }
+  .lvl { display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:500; padding:2px 8px; border-radius:4px; background:var(--soft); color:var(--muted); white-space:nowrap; }
+  .lvl.HIGH { background:var(--bad-bg); color:var(--bad); } .lvl.MEDIUM { background:var(--warn-bg); color:var(--warn); } .lvl.LOW { background:var(--ok-bg); color:var(--ok); }
+  .chip { font-size:12px; padding:1px 6px; border-radius:4px; background:var(--soft); color:var(--muted); white-space:nowrap; border:1px solid var(--line); }
+  .chip.blacklist { background:var(--bad-bg); color:var(--bad); border-color:transparent; }
+  .chip.unknown, .chip.hidden { background:var(--warn-bg); color:var(--warn); border-color:transparent; }
+  .chip.act { background:var(--navy-soft); color:var(--navy); border-color:transparent; }
+  .pctcell { font-weight:700; font-variant-numeric:tabular-nums; }
+  .pctcell.HIGH { color:var(--bad); } .pctcell.MEDIUM { color:var(--warn); }
+  svg.spark { width:160px; height:28px; display:block; }
+  .drawer svg.spark { width:100%; height:44px; }
+  .section { margin-top:20px; }
+  .section h2 { font-size:15px; font-weight:500; color:var(--navy); margin:0 0 8px; }
+  .tabs { display:flex; border:1px solid var(--line); border-radius:8px; overflow:hidden; background:#fff; }
+  .tabs button { border:0; background:none; padding:7px 14px; cursor:pointer; color:var(--fg); }
+  .tabs button + button { border-left:1px solid var(--line); }
+  .tabs button.on { background:var(--navy); color:#fff; }
+  .btn { border:1px solid var(--line); background:#fff; padding:7px 12px; border-radius:8px; cursor:pointer; }
+  .btn:hover { border-color:var(--navy); color:var(--navy); }
+  .btn.primary { background:var(--navy); color:#fff; border-color:var(--navy); }
+  .btn.orange { background:var(--orange); color:#fff; border-color:var(--orange); }
   .btn.bad { background:var(--bad); color:#fff; border-color:var(--bad); }
   .btn.good { background:var(--ok); color:#fff; border-color:var(--ok); }
-  .btn.sm { padding:4px 10px; font-size:13px; }
-  .form { display:flex; gap:8px; flex-wrap:wrap; padding:14px; border-bottom:1px solid var(--line); }
-  .form input { padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:var(--card); min-width:180px; }
-  /* KPIs */
-  .kpis { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:12px; }
-  .kpi { padding:16px; }
-  .kpi .v { font-size:30px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1.1; }
+  .btn.sm { padding:3px 10px; font-size:13px; }
+  .form { display:flex; gap:8px; flex-wrap:wrap; padding:12px; border-bottom:1px solid var(--line); }
+  .form input { padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:#fff; min-width:200px; }
+  .form input:focus, textarea:focus { outline:none; border-color:var(--navy); }
+  /* chỉ số */
+  .kpis { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:12px; }
+  .kpi { padding:14px 16px; border-top:3px solid var(--navy); }
+  .kpi .v { font-size:26px; font-weight:700; font-variant-numeric:tabular-nums; line-height:1.15; color:var(--navy); }
   .kpi .l { color:var(--muted); font-size:13px; }
-  .kpi.bad .v { color:var(--bad); } .kpi.warn .v { color:var(--warn); } .kpi.ok .v { color:var(--ok); }
-  /* drawer */
-  .scrim { position:fixed; inset:0; background:rgba(10,14,20,.35); display:none; z-index:20; }
+  .kpi.bad { border-top-color:var(--bad); } .kpi.bad .v { color:var(--bad); }
+  .kpi.warn { border-top-color:var(--warn); } .kpi.warn .v { color:var(--warn); }
+  /* ngăn chi tiết */
+  .scrim { position:fixed; inset:0; background:rgba(33,37,41,.35); display:none; z-index:20; }
   .scrim.on { display:block; }
-  .drawer { visibility:hidden; position:fixed; top:0; right:0; bottom:0; width:min(560px,100%); background:var(--card); z-index:21; transform:translateX(100%);
-            transition:transform .2s ease; overflow:auto; padding:22px; border-left:1px solid var(--line); }
+  .drawer { visibility:hidden; position:fixed; top:0; right:0; bottom:0; width:min(560px,100%); background:#fff; z-index:21; transform:translateX(100%);
+            transition:transform .2s ease; overflow:auto; border-left:1px solid var(--line); }
   .drawer.on { transform:none; visibility:visible; }
-  .drawer .x { float:right; border:0; background:none; font-size:22px; cursor:pointer; color:var(--muted); }
-  .verdict { border-radius:12px; padding:16px; display:flex; align-items:center; gap:14px; margin:12px 0; }
+  .drawer .dh { background:var(--navy); color:#fff; padding:14px 18px; display:flex; align-items:center; gap:10px; position:sticky; top:0; z-index:1; }
+  .drawer .dh h2 { margin:0; font-size:17px; font-weight:500; flex:1; }
+  .drawer .dh .x { border:0; background:none; font-size:22px; cursor:pointer; color:#fff; line-height:1; }
+  .drawer .db { padding:16px 18px 24px; }
+  .drawer h3 { font-size:14px; font-weight:500; color:var(--navy); margin:18px 0 8px; padding-bottom:4px; border-bottom:1px solid var(--line); }
+  .verdict { border-radius:8px; padding:14px 16px; display:flex; align-items:center; gap:14px; margin:0 0 4px; }
   .verdict.HIGH { background:var(--bad-bg); color:var(--bad); } .verdict.MEDIUM { background:var(--warn-bg); color:var(--warn); }
   .verdict.LOW { background:var(--ok-bg); color:var(--ok); } .verdict.NONE { background:var(--soft); color:var(--muted); }
-  .verdict b { font-size:22px; display:block; }
-  .verdict .p { margin-left:auto; font-size:34px; font-weight:800; line-height:1; }
-  .verdict p { margin:0; color:var(--fg); font-size:14px; }
-  .segs { position:relative; height:30px; background:var(--soft); border-radius:6px; margin:8px 0 4px; }
-  .segs button { position:absolute; top:4px; bottom:4px; border:0; border-radius:3px; cursor:pointer; padding:0; }
-  .segs button.HIGH { background:var(--bad); } .segs button.MEDIUM { background:var(--warn); } .segs button.LOW { background:var(--ok); opacity:.55; }
-  .segs button:hover { outline:2px solid var(--fg); }
-  .segs .ph { position:absolute; top:0; bottom:0; width:2px; background:var(--fg); pointer-events:none; }
+  .verdict b { font-size:20px; font-weight:700; display:block; }
+  .verdict .p { margin-left:auto; font-size:30px; font-weight:700; line-height:1; text-align:right; }
+  .verdict p { margin:0; color:var(--fg); font-size:13px; }
+  .segs { position:relative; height:28px; background:var(--soft); border:1px solid var(--line); border-radius:4px; margin:8px 0 4px; }
+  .segs button { position:absolute; top:3px; bottom:3px; border:0; border-radius:2px; cursor:pointer; padding:0; }
+  .segs button.HIGH { background:var(--bad); } .segs button.MEDIUM { background:var(--warn); } .segs button.LOW { background:var(--ok); opacity:.5; }
+  .segs button:hover { outline:2px solid var(--navy); }
+  .segs .ph { position:absolute; top:0; bottom:0; width:2px; background:var(--navy); pointer-events:none; }
   .ticks { display:flex; justify-content:space-between; font-size:12px; color:var(--muted); }
   .suspects { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
-  .acts { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:12px 0; }
-  .kv { display:grid; grid-template-columns:auto 1fr; gap:4px 14px; font-size:14px; }
+  .acts { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .kv { display:grid; grid-template-columns:auto 1fr; gap:4px 14px; font-size:13px; margin:0; }
   .kv dt { color:var(--muted); } .kv dd { margin:0; }
-  textarea { width:100%; min-height:60px; padding:8px; border:1px solid var(--line); border-radius:8px; background:var(--card); }
-  .note { font-size:13px; color:var(--muted); }
-  /* toast */
+  textarea { width:100%; min-height:56px; padding:8px; border:1px solid var(--line); border-radius:8px; background:#fff; margin-bottom:8px; }
+  .note { font-size:12px; color:var(--muted); }
+  audio { width:100%; height:36px; }
+  /* thông báo */
   .toasts { position:fixed; right:18px; bottom:18px; display:flex; flex-direction:column; gap:8px; z-index:30; }
-  .toast { background:var(--bad); color:#fff; padding:12px 16px; border-radius:10px; box-shadow:var(--shadow); cursor:pointer; max-width:340px; }
-  .toast b { display:block; }
-  @media (max-width:760px) { body { flex-direction:column; } nav { width:auto; flex-direction:row; overflow:auto; padding:8px; } nav .brand, nav .foot, nav a small { display:none; } main { padding:16px; } }
+  .toast { background:#fff; border:1px solid var(--line); border-left:4px solid var(--bad); color:var(--fg); padding:10px 14px; border-radius:6px;
+           box-shadow:0 6px 18px rgba(33,37,41,.12); cursor:pointer; max-width:340px; }
+  .toast b { display:block; color:var(--bad); }
+  @media (max-width:760px) { body { flex-direction:column; } nav { width:auto; flex-direction:row; overflow:auto; border-right:0; border-bottom:1px solid var(--line); }
+    nav .brand, nav .foot { display:none; } nav a span:not(.badge) { white-space:nowrap; } main { padding:12px; } }
 </style>
 </head>
 <body>
 <nav>
-  <div class="brand"><svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z" fill="#6c9cff"/><path d="M8 12h1m2-3v6m2-4v2m2-3v4" stroke="#0b0f14" stroke-width="1.8" stroke-linecap="round"/></svg>VoiceGuard</div>
-  <a href="#live" data-v="live"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z"/></svg><span>Cuộc gọi trực tiếp<small>Nhân viên tổng đài</small></span><span class="badge" id="liveBadge" hidden></span></a>
-  <a href="#review" data-v="review"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>Hàng đợi điều tra<small>Chống gian lận</small></span><span class="badge" id="reviewBadge" hidden></span></a>
-  <a href="#numbers" data-v="numbers"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span>Danh sách số<small>Chống gian lận</small></span></a>
-  <a href="#overview" data-v="overview"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10m6 10V4m6 16v-7m6 7H2"/></svg><span>Tổng quan<small>Giám sát</small></span></a>
-  <a href="#check" data-v="check"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg><span>Kiểm tra tệp<small>Tin nhắn thoại, bản ghi</small></span></a>
-  <div class="foot"><span class="dot off" id="conn"></span><span id="connText">Đang kết nối...</span><div id="modelInfo"></div></div>
+  <div class="brand">VOICEGUARD<small>Giám định giọng nói tổng đài</small></div>
+  <a href="#live" data-v="live"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z"/></svg><span>Cuộc gọi trực tiếp</span><span class="badge" id="liveBadge" hidden></span></a>
+  <a href="#review" data-v="review"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>Hàng đợi điều tra</span><span class="badge" id="reviewBadge" hidden></span></a>
+  <a href="#numbers" data-v="numbers"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span>Danh sách số</span></a>
+  <a href="#overview" data-v="overview"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20V10m6 10V4m6 16v-7m6 7H2"/></svg><span>Tổng quan</span></a>
+  <a href="#check" data-v="check"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg><span>Kiểm tra tệp</span></a>
+  <div class="foot"><span class="dot off" id="conn"></span><span id="connText">Đang kết nối</span><div id="modelInfo"></div></div>
 </nav>
-<main id="view"></main>
+<div class="shell">
+  <header class="topbar"><h1 id="title"></h1><div class="grow"></div><span class="clock" id="clock"></span></header>
+  <main id="view"></main>
+</div>
 <div class="scrim" id="scrim"></div>
 <aside class="drawer" id="drawer" aria-live="polite"></aside>
 <div class="toasts" id="toasts"></div>
@@ -133,16 +147,16 @@
 <script>
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const LEVEL = {HIGH:{w:"Rủi ro cao", i:"⛔"}, MEDIUM:{w:"Cần xác minh", i:"⚠"}, LOW:{w:"Bình thường", i:"✓"}};
+const LEVEL = {HIGH:{w:"Rủi ro cao"}, MEDIUM:{w:"Cần xác minh"}, LOW:{w:"Bình thường"}};
+const TITLES = {live:"Cuộc gọi trực tiếp", review:"Hàng đợi điều tra", numbers:"Danh sách số", overview:"Tổng quan", check:"Kiểm tra tệp"};
+const DOT = '<svg width="8" height="8" viewBox="0 0 8 8" aria-hidden="true"><circle cx="4" cy="4" r="4" fill="currentColor"/></svg>';
+const ICON = {refresh:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg>',
+              download:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg>'};
 const CAT = {registered:"Khách đã đăng ký", unknown:"Số chưa đăng ký", hidden:"Số ẩn", blacklist:"Trong blacklist", not_provided:"Không có số"};
 const CH = {none:"Tệp/ghi âm gốc", opus12:"Zalo, Messenger", amrnb:"Di động 3G, 4G", amrwb:"VoLTE", g711u:"Tổng đài", g711a:"Tổng đài (A-law)",
             gsm:"Di động 2G", g722:"Tổng đài IP", mp3_32:"Tin nhắn thoại", nb8k:"Băng hẹp"};
 const ACT = {continue:"Đã xác minh, tiếp tục", verify:"Đang xác minh thêm", hold:"Tạm giữ giao dịch", transfer:"Đã chuyển chống gian lận"};
-const ADVICE = {
-  HIGH:"Tạm giữ giao dịch, không xác nhận OTP hay đổi thông tin. Chuyển cuộc gọi cho bộ phận chống gian lận.",
-  MEDIUM:"Trước thao tác nhạy cảm, xác minh thêm: gọi lại số đã đăng ký hoặc xác thực qua ứng dụng.",
-  LOW:"Tiếp tục quy trình bình thường.",
-};
+const ADVICE = {HIGH:"Tạm giữ giao dịch, chuyển chống gian lận", MEDIUM:"Xác minh thêm trước thao tác nhạy cảm", LOW:"Tiếp tục bình thường"};
 let active = new Map(), recent = [], view = "live", health = null, audioCtx = null;
 
 // ---------- helpers ----------
@@ -150,7 +164,7 @@ const ago = t => { const s = Math.max(0, Date.now() / 1000 - t); return s < 60 ?
 const clock = t => { if (!t) return "–"; const d = new Date(t * 1000), p = n => String(n).padStart(2, "0");
   return `${p(d.getHours())}:${p(d.getMinutes())} ${p(d.getDate())}/${p(d.getMonth() + 1)}`; };
 const dur = s => s == null ? "–" : `${(s / 60) | 0}:${String(Math.round(s % 60)).padStart(2, "0")}`;
-const lvlTag = l => l ? `<span class="lvl ${l}">${LEVEL[l].i} ${LEVEL[l].w}</span>` : `<span class="lvl">Đang nghe...</span>`;
+const lvlTag = l => l ? `<span class="lvl ${l}">${DOT}${LEVEL[l].w}</span>` : `<span class="lvl">Đang nghe</span>`;
 const pct = c => c.spoof_percent == null ? "" : `${Math.round(c.spoof_percent)}%<small>khả năng giả</small>`;
 async function api(path, opt) { const r = await fetch(path, opt); const d = await r.json(); if (!r.ok) throw new Error(d.detail || r.statusText); return d; }
 const post = (path, data) => api(path, {method:"POST", body:new URLSearchParams(data)});
@@ -177,7 +191,7 @@ function beep() {
 }
 function toast(c) {
   const t = document.createElement("div"); t.className = "toast";
-  t.innerHTML = `<b>⛔ Cảnh báo rủi ro cao</b>${esc(c.caller_masked)} · ${esc(CH[c.channel] || c.channel)}${c.spoof_percent != null ? ` · ${Math.round(c.spoof_percent)}% khả năng giả` : " · số trong blacklist"}`;
+  t.innerHTML = `<b>Rủi ro cao</b>${esc(c.caller_masked)} · ${esc(CH[c.channel] || c.channel)}${c.spoof_percent != null ? ` · ${Math.round(c.spoof_percent)}% khả năng giả` : " · số trong blacklist"}`;
   t.onclick = () => { openCall(c.id); t.remove(); };
   $("toasts").append(t); setTimeout(() => t.remove(), 9000); beep();
 }
@@ -185,8 +199,8 @@ function toast(c) {
 // ---------- events ----------
 function connect() {
   const es = new EventSource("/v1/events");
-  es.onopen = () => { $("conn").classList.remove("off"); $("connText").textContent = "Đã kết nối, cập nhật trực tiếp"; };
-  es.onerror = () => { $("conn").classList.add("off"); $("connText").textContent = "Mất kết nối, đang thử lại..."; };
+  es.onopen = () => { $("conn").classList.remove("off"); $("connText").textContent = "Đã kết nối"; };
+  es.onerror = () => { $("conn").classList.add("off"); $("connText").textContent = "Mất kết nối"; };
   es.onmessage = e => {
     const ev = JSON.parse(e.data);
     if (ev.type === "call_started") active.set(ev.call.id, {...ev.call, windows:[]});
@@ -227,18 +241,20 @@ async function badges() {
 // ---------- views ----------
 function setView() {
   view = (location.hash || "#live").slice(1);
+  if (!TITLES[view]) view = "live";
   document.querySelectorAll("nav a[data-v]").forEach(a => a.classList.toggle("on", a.dataset.v === view));
+  $("title").textContent = TITLES[view];
   render();
 }
 window.addEventListener("hashchange", setView);
-function render() { ({live:renderLive, review:renderReview, numbers:renderNumbers, overview:renderOverview, check:renderCheck}[view] || renderLive)(); }
+function render() { ({live:renderLive, review:renderReview, numbers:renderNumbers, overview:renderOverview, check:renderCheck}[view])(); }
+const tool = (left, right = "") => `<div class="toolbar">${left}<div class="grow"></div>${right}</div>`;
+const refreshBtn = `<button class="iconbtn" id="refresh" title="Làm mới">${ICON.refresh}</button>`;
+function bindRefresh() { const b = $("refresh"); if (b) b.onclick = render; }
 
 function renderCheck() {
   if ($("checkFrame")) return;                                              // keep the tool's state across events
-  $("view").innerHTML = `
-    <div class="head"><div class="grow"><h1>Kiểm tra tệp</h1>
-      <p class="sub">Tin nhắn thoại hoặc bản ghi khách hàng gửi tới.</p></div></div>
-    <iframe id="checkFrame" src="/check?embed=1" title="Kiểm tra tệp" style="width:100%;border:0;display:block;height:700px"></iframe>`;
+  $("view").innerHTML = `<iframe id="checkFrame" src="/check?embed=1" title="Kiểm tra tệp" style="width:100%;border:0;display:block;height:700px"></iframe>`;
   const f = $("checkFrame");
   // Height of the tool's own content, not of the frame's viewport, so the frame can shrink as well as grow.
   const fit = () => { try { f.style.height = Math.ceil(f.contentDocument.querySelector(".wrap").getBoundingClientRect().height) + 4 + "px"; } catch {} };
@@ -248,30 +264,28 @@ function renderCheck() {
 function renderLive() {
   const order = {HIGH:0, MEDIUM:1, LOW:2};
   const calls = [...active.values()].sort((a, b) => (order[a.risk_level] ?? 3) - (order[b.risk_level] ?? 3) || a.started_at - b.started_at);
+  const hi = calls.filter(c => c.risk_level === "HIGH").length, me = calls.filter(c => c.risk_level === "MEDIUM").length;
   $("view").innerHTML = `
-    <div class="head"><div class="grow"><h1>Cuộc gọi trực tiếp</h1>
-      <p class="sub">Cập nhật mỗi 2 giây.</p></div>
-      <span class="chip">${calls.length} cuộc gọi đang diễn ra</span></div>
-    ${calls.length ? `<div class="grid">${calls.map(callCard).join("")}</div>` :
-      `<div class="card empty">Chưa có cuộc gọi nào.</div>`}
-    <div class="section"><h2>Vừa kết thúc</h2>${recent.length ? `<div class="card">${callTable(recent, false)}</div>` : `<p class="note">Chưa có.</p>`}</div>`;
+    ${tool(`<span class="count">${calls.length} cuộc gọi đang diễn ra${hi ? ` · <b style="color:var(--bad)">${hi} rủi ro cao</b>` : ""}${me ? ` · <b style="color:var(--warn)">${me} cần xác minh</b>` : ""}</span>`)}
+    <div class="card"><div class="tablewrap"><table><thead><tr><th>Số gọi đến</th><th>Phân loại số</th><th>Kênh</th><th>Thời lượng</th><th>Diễn biến</th><th>Khả năng giả</th><th>Mức rủi ro</th><th>Xử lý</th></tr></thead><tbody>
+      ${calls.map(c => `<tr class="click ${c.risk_level || ""} ${c.flash ? "flash" : ""}" data-id="${c.id}">
+        <td class="num"><b>${esc(c.caller_masked)}</b></td><td><span class="chip ${c.category}">${CAT[c.category] || c.category}</span></td>
+        <td>${esc(CH[c.channel] || c.channel)}</td><td class="num">${dur(c.duration_s)}</td><td>${spark(c.windows, c.policy)}</td>
+        <td class="num pctcell ${c.risk_level || ""}">${c.spoof_percent == null ? (c.screened_by === "prefilter" ? "chặn theo số" : "–") : Math.round(c.spoof_percent) + "%"}</td>
+        <td>${lvlTag(c.risk_level)}</td><td>${c.action ? `<span class="chip act">${ACT[c.action]}</span>` : "–"}</td></tr>`).join("")
+        || `<tr><td colspan="8" class="empty">Không có cuộc gọi nào</td></tr>`}
+    </tbody></table></div></div>
+    <div class="section"><h2>Vừa kết thúc</h2><div class="card">${callTable(recent, false)}</div></div>`;
   calls.forEach(c => c.flash = false);
   bindRows();
 }
-function callCard(c) {
-  return `<div class="card call ${c.risk_level || ""} ${c.flash ? "flash" : ""}" data-id="${c.id}">
-    <div class="row"><div><div class="num">${esc(c.caller_masked)}</div>
-      <div class="meta">${esc(CH[c.channel] || c.channel)} · ${dur(c.duration_s)}</div></div>
-      <div class="pct" style="color:var(--${c.risk_level === "HIGH" ? "bad" : c.risk_level === "MEDIUM" ? "warn" : "fg"})">${pct(c)}</div></div>
-    ${spark(c.windows, c.policy)}
-    <div class="row" style="flex-wrap:wrap">${lvlTag(c.risk_level)}<span class="chip ${c.category}">${CAT[c.category] || c.category}</span>
-      ${c.action ? `<span class="chip act">${ACT[c.action]}</span>` : ""}</div></div>`;
-}
 function callTable(rows, review) {
-  return `<div class="tablewrap"><table><thead><tr><th>Thời gian</th><th>Số gọi đến</th><th>Kênh</th><th>Mức cao nhất</th><th>Khả năng giả</th><th>Nhân viên</th>${review ? "<th>Kết luận</th>" : ""}</tr></thead><tbody>
-    ${rows.map(c => `<tr class="click" data-id="${c.id}"><td class="num">${clock(c.started_at)}</td><td class="num">${esc(c.caller_masked)}<br><span class="chip ${c.category}">${CAT[c.category] || ""}</span></td>
-      <td>${esc(CH[c.channel] || c.channel)}</td><td>${lvlTag(c.max_level)}</td><td class="num">${c.spoof_percent == null ? (c.screened_by === "prefilter" ? "chặn theo số" : "–") : Math.round(c.spoof_percent) + "%"}</td>
-      <td>${c.action ? ACT[c.action] : "–"}</td>${review ? `<td>${c.verdict === "fraud" ? '<span class="lvl HIGH">Gian lận</span>' : c.verdict === "genuine" ? '<span class="lvl LOW">Khách thật</span>' : '<span class="lvl MEDIUM">Chờ kết luận</span>'}</td>` : ""}</tr>`).join("")}
+  return `<div class="tablewrap"><table><thead><tr><th>Thời gian</th><th>Số gọi đến</th><th>Phân loại số</th><th>Kênh</th><th>Thời lượng</th><th>Mức cao nhất</th><th>Khả năng giả</th><th>Xử lý</th>${review ? "<th>Kết luận</th>" : ""}</tr></thead><tbody>
+    ${rows.map(c => `<tr class="click" data-id="${c.id}"><td class="num">${clock(c.started_at)}</td><td class="num">${esc(c.caller_masked)}</td>
+      <td><span class="chip ${c.category}">${CAT[c.category] || ""}</span></td><td>${esc(CH[c.channel] || c.channel)}</td><td class="num">${dur(c.duration_s)}</td>
+      <td>${lvlTag(c.max_level)}</td><td class="num pctcell ${c.max_level || ""}">${c.spoof_percent == null ? (c.screened_by === "prefilter" ? "chặn theo số" : "–") : Math.round(c.spoof_percent) + "%"}</td>
+      <td>${c.action ? ACT[c.action] : "–"}</td>${review ? `<td>${c.verdict === "fraud" ? '<span class="lvl HIGH">Gian lận</span>' : c.verdict === "genuine" ? '<span class="lvl LOW">Khách thật</span>' : '<span class="lvl MEDIUM">Chờ kết luận</span>'}</td>` : ""}</tr>`).join("")
+      || `<tr><td colspan="${review ? 9 : 8}" class="empty">Không có dữ liệu</td></tr>`}
   </tbody></table></div>`;
 }
 function bindRows() { document.querySelectorAll("[data-id]").forEach(el => el.onclick = () => openCall(el.dataset.id)); }
@@ -280,13 +294,11 @@ let reviewAll = false;
 async function renderReview() {
   const rows = await api(`/v1/calls?min_level=MEDIUM&status=ended&limit=300${reviewAll ? "" : "&unreviewed=true"}`);
   $("view").innerHTML = `
-    <div class="head"><div class="grow"><h1>Hàng đợi điều tra</h1>
-      <p class="sub">Cuộc gọi cần xác minh hoặc rủi ro cao.</p></div>
-      <div class="tabs"><button class="${reviewAll ? "" : "on"}" id="rq1">Chờ kết luận</button><button class="${reviewAll ? "on" : ""}" id="rq2">Tất cả</button></div></div>
-    <div class="card">${rows.length ? callTable(rows, true) : `<div class="empty">Không còn cuộc gọi nào chờ kết luận.</div>`}</div>`;
+    ${tool(`<div class="tabs"><button class="${reviewAll ? "" : "on"}" id="rq1">Chờ kết luận</button><button class="${reviewAll ? "on" : ""}" id="rq2">Tất cả</button></div>`, refreshBtn)}
+    <div class="card">${callTable(rows, true)}</div>`;
   $("rq1").onclick = () => { reviewAll = false; renderReview(); };
   $("rq2").onclick = () => { reviewAll = true; renderReview(); };
-  bindRows();
+  bindRows(); bindRefresh();
 }
 
 let numTab = "blacklist";
@@ -294,24 +306,24 @@ async function renderNumbers() {
   const rows = await api(`/v1/numbers?list=${numTab}`);
   const tab = (k, t) => `<button class="${numTab === k ? "on" : ""}" data-t="${k}">${t}</button>`;
   $("view").innerHTML = `
-    <div class="head"><div class="grow"><h1>Danh sách số</h1>
-      <p class="sub">Số trong blacklist bị chặn ngay khi gọi tới.</p></div>
-      <div class="tabs">${tab("blacklist", "Blacklist")}${tab("registered", "Đã đăng ký")}${tab("suggested", "Đề xuất chặn")}</div></div>
+    ${tool(`<div class="tabs">${tab("blacklist", "Blacklist")}${tab("registered", "Đã đăng ký")}${tab("suggested", "Đề xuất chặn")}</div>`, refreshBtn)}
     <div class="card">
       ${numTab !== "suggested" ? `<form class="form" id="addForm"><input name="number" placeholder="Số điện thoại" required inputmode="tel">
-        <input name="note" placeholder="Ghi chú"><button class="btn primary">Thêm vào ${numTab === "blacklist" ? "blacklist" : "danh sách đăng ký"}</button></form>` : ""}
-      ${rows.length ? `<table><thead><tr><th>Số (đã che)</th>${numTab === "suggested" ? "<th>Lần rủi ro cao</th><th>Gian lận / Khách thật</th>" : "<th>Nguồn</th><th>Ngày thêm</th><th>Số cuộc gọi</th>"}<th>Lần gọi gần nhất</th><th></th></tr></thead><tbody>
+        <input name="note" placeholder="Ghi chú"><button class="btn orange">Thêm</button></form>` : ""}
+      <div class="tablewrap"><table><thead><tr><th>Số điện thoại</th>${numTab === "suggested" ? "<th>Lần rủi ro cao</th><th>Gian lận / Khách thật</th>" : "<th>Nguồn</th><th>Ghi chú</th><th>Ngày thêm</th><th>Số cuộc gọi</th>"}<th>Lần gọi gần nhất</th><th>Thao tác</th></tr></thead><tbody>
         ${rows.map(n => `<tr><td class="num">${esc(n.masked)}</td>${numTab === "suggested" ? `<td class="num">${n.high_calls}</td><td class="num">${n.fraud || 0} / ${n.genuine || 0}</td>` :
-          `<td>${esc(n.source)}${n.note ? `<br><span class="note">${esc(n.note)}</span>` : ""}</td><td class="num">${clock(n.added_at)}</td><td class="num">${n.calls}</td>`}
-          <td class="num">${n.last_call ? ago(n.last_call) + " trước" : "–"}</td>
-          <td>${numTab === "suggested" ? `<button class="btn sm bad" data-add="${n.key}">Đưa vào blacklist</button>` : `<button class="btn sm" data-del="${n.key}">Gỡ</button>`}</td></tr>`).join("")}
-      </tbody></table>` : `<div class="empty">${numTab === "suggested" ? "Chưa có số nào gọi tới nhiều lần với mức rủi ro cao." : "Danh sách trống."}</div>`}
+          `<td>${esc(n.source)}</td><td>${esc(n.note) || "–"}</td><td class="num">${clock(n.added_at)}</td><td class="num">${n.calls}</td>`}
+          <td class="num">${n.last_call ? clock(n.last_call) : "–"}</td>
+          <td>${numTab === "suggested" ? `<button class="btn sm bad" data-add="${n.key}">Chặn</button>` : `<button class="btn sm" data-del="${n.key}">Gỡ</button>`}</td></tr>`).join("")
+          || `<tr><td colspan="7" class="empty">Không có dữ liệu</td></tr>`}
+      </tbody></table></div>
     </div>`;
   document.querySelectorAll("[data-t]").forEach(b => b.onclick = () => { numTab = b.dataset.t; renderNumbers(); });
   document.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => { await api(`/v1/numbers/${b.dataset.del}?list=${numTab}`, {method:"DELETE"}); renderNumbers(); });
   document.querySelectorAll("[data-add]").forEach(b => b.onclick = async () => { await post("/v1/numbers", {key:b.dataset.add, list:"blacklist", note:"duyệt từ đề xuất"}); renderNumbers(); });
   const f = $("addForm");
   if (f) f.onsubmit = async e => { e.preventDefault(); try { await post("/v1/numbers", {...Object.fromEntries(new FormData(f)), list:numTab}); renderNumbers(); } catch (err) { alert(err.message); } };
+  bindRefresh();
 }
 
 async function renderOverview() {
@@ -321,25 +333,25 @@ async function renderOverview() {
   const maxH = Math.max(1, ...s.by_hour.map(h => h.n));
   const bars = Array.from({length:24}, (_, i) => s.by_hour.find(h => h.h === i) || {h:i, n:0, high:0, medium:0});
   $("view").innerHTML = `
-    <div class="head"><div class="grow"><h1>Tổng quan</h1><p class="sub">24 giờ gần nhất.</p></div></div>
+    ${tool(`<span class="count">24 giờ gần nhất</span>`, refreshBtn)}
     <div class="kpis">
       ${k(s.total, "Cuộc gọi")}${k(s.open_calls, "Đang diễn ra")}${k(s.high, "Rủi ro cao", "bad")}${k(s.medium, "Cần xác minh", "warn")}
       ${k(s.blocked, "Chặn theo blacklist", "bad")}${k(s.pending, "Chờ kết luận", "warn")}${k(s.fraud, "Gian lận đã xác nhận", "bad")}
-      ${k(fa == null ? "–" : fa + "%", "Cảnh báo nhầm (trong số đã kết luận)")}${k(s.latency_p95_ms == null ? "–" : Math.round(s.latency_p95_ms) + " ms", "Độ trễ p95 mỗi lần chấm")}
+      ${k(fa == null ? "–" : fa + "%", "Cảnh báo nhầm")}${k(s.latency_p95_ms == null ? "–" : Math.round(s.latency_p95_ms) + " ms", "Độ trễ p95")}
       ${k(s.held, "Giao dịch tạm giữ")}
     </div>
-    <div class="section"><h2>Cuộc gọi theo giờ</h2><div class="card" style="padding:16px">
+    <div class="section"><h2>Cuộc gọi theo giờ</h2><div class="card" style="padding:14px 16px">
       <svg viewBox="0 0 720 160" width="100%" role="img" aria-label="Số cuộc gọi theo giờ">
         ${bars.map((b, i) => { const x = 10 + i * 29, h = 120 * b.n / maxH, hh = 120 * b.high / maxH, hm = 120 * b.medium / maxH;
-          return `<g><title>Giờ ${i}: ${b.n} cuộc gọi, ${b.high} rủi ro cao, ${b.medium} cần xác minh</title>
-            <rect x="${x}" y="${130 - h}" width="22" height="${h}" rx="3" style="fill:var(--soft)"/>
+          return `<g><title>${i}h: ${b.n} cuộc gọi, ${b.high} rủi ro cao, ${b.medium} cần xác minh</title>
+            <rect x="${x}" y="${130 - h}" width="22" height="${h}" rx="2" style="fill:var(--navy-soft)"/>
             <rect x="${x}" y="${130 - hh - hm}" width="22" height="${hm}" style="fill:var(--warn)"/>
             <rect x="${x}" y="${130 - hh}" width="22" height="${hh}" style="fill:var(--bad)"/>
             ${i % 3 === 0 ? `<text x="${x + 11}" y="150" text-anchor="middle" style="fill:var(--muted);font-size:11px">${i}h</text>` : ""}</g>`; }).join("")}
       </svg>
-      <p class="note">Xám: bình thường · Vàng: cần xác minh · Đỏ: rủi ro cao</p></div></div>
+      <div class="note" style="display:flex;gap:14px"><span style="color:var(--navy)">${DOT} Bình thường</span><span style="color:var(--warn)">${DOT} Cần xác minh</span><span style="color:var(--bad)">${DOT} Rủi ro cao</span></div></div></div>
     <div class="section"><h2>Rủi ro cao gần đây</h2><div class="card">${callTable(await api("/v1/calls?min_level=HIGH&limit=10"), true)}</div></div>`;
-  bindRows();
+  bindRows(); bindRefresh();
 }
 
 // ---------- drawer: one call ----------
@@ -352,37 +364,36 @@ async function refreshDrawer() {
   if (!drawerId) return;
   const c = await api(`/v1/calls/${drawerId}`), live = c.status === "active", l = c.risk_level || "NONE";
   const blocked = c.screened_by === "prefilter";
-  $("drawer").innerHTML = `<button class="x" aria-label="Đóng">×</button>
-    <h2 style="margin:0">${esc(c.caller_masked)}</h2>
-    <div class="note">${CAT[c.category] || ""} · ${esc(CH[c.channel] || c.channel)} · bắt đầu ${clock(c.started_at)} · ${live ? "đang diễn ra" : "đã kết thúc"}, ${dur(c.duration_s)}</div>
-    <div class="verdict ${l}"><div><b>${c.risk_level ? LEVEL[c.risk_level].i + " " + LEVEL[c.risk_level].w : "Đang nghe..."}</b>
-      <p>${blocked ? "Số nằm trong blacklist: cuộc gọi bị chặn trước khi phân tích giọng." : c.risk_level ? ADVICE[c.risk_level] : "Cần khoảng 4 giây âm thanh để có kết luận đầu tiên."}</p></div>
-      ${c.spoof_percent != null ? `<div class="p">${Math.round(c.spoof_percent)}%<small style="display:block;font-size:12px;font-weight:600;text-align:right;white-space:nowrap">khả năng giả</small></div>` : ""}</div>
-    ${c.spoof_percent != null && c.risk_level !== "LOW" && c.spoof_percent < 50 && ["unknown","hidden"].includes(c.category) ? `<p class="note">Nâng mức do số chưa đăng ký hoặc bị ẩn.</p>` : ""}
-    ${c.windows.length ? `<h3>Diễn biến trong cuộc gọi</h3>${spark(c.windows, c.policy)}` : ""}
-    <h3>Nghe lại cuộc gọi</h3>
-    ${c.recording ? playerHtml(c) : `<p class="note">${live ? "Bản ghi có sau khi cuộc gọi kết thúc. Hệ thống chỉ giữ âm thanh của cuộc gọi cần xác minh hoặc rủi ro cao." :
-        ["MEDIUM", "HIGH"].includes(c.max_level) ? "Cuộc gọi này không có bản ghi (đã quá thời hạn lưu hoặc tắt ghi âm)." :
-        "Cuộc gọi bình thường không được lưu âm thanh."}${c.recording_ref ? ` Mã bản ghi của tổng đài: <code>${esc(c.recording_ref)}</code>.` : ""}</p>`}
-    <h3>Nhân viên tổng đài</h3>
+  $("drawer").innerHTML = `<div class="dh"><h2>${esc(c.caller_masked)}</h2><button class="x" aria-label="Đóng">×</button></div><div class="db">
+    <dl class="kv" style="margin-bottom:12px">
+      <dt>Phân loại số</dt><dd>${CAT[c.category] || ""}</dd><dt>Kênh</dt><dd>${esc(CH[c.channel] || c.channel)}</dd>
+      <dt>Bắt đầu</dt><dd>${clock(c.started_at)} · ${live ? "đang diễn ra" : "đã kết thúc"} · ${dur(c.duration_s)}</dd>
+    </dl>
+    <div class="verdict ${l}"><div><b>${blocked ? "Chặn theo blacklist" : c.risk_level ? LEVEL[c.risk_level].w : "Đang nghe"}</b>
+      ${c.risk_level && !blocked ? `<p>${ADVICE[c.risk_level]}</p>` : ""}</div>
+      ${c.spoof_percent != null ? `<div class="p">${Math.round(c.spoof_percent)}%<small style="display:block;font-size:12px;font-weight:500;white-space:nowrap">khả năng giả</small></div>` : ""}</div>
+    ${c.windows.length ? `<h3>Diễn biến</h3>${spark(c.windows, c.policy)}` : ""}
+    <h3>Ghi âm</h3>
+    ${c.recording ? playerHtml(c) : `<p class="note">${live ? "Có sau khi kết thúc cuộc gọi" : "Không lưu"}</p>`}
+    <h3>Xử lý</h3>
     <div class="acts">
-      <button class="btn ${c.action === "continue" ? "primary" : ""}" data-act="continue">✓ Đã xác minh, tiếp tục</button>
-      <button class="btn ${c.action === "verify" ? "primary" : ""}" data-act="verify">⚠ Đang xác minh thêm</button>
-      <button class="btn ${c.action === "hold" ? "primary" : ""}" data-act="hold">⏸ Tạm giữ giao dịch</button>
-      <button class="btn ${c.action === "transfer" ? "primary" : ""}" data-act="transfer">→ Chuyển chống gian lận</button>
+      <button class="btn ${c.action === "continue" ? "primary" : ""}" data-act="continue">Đã xác minh, tiếp tục</button>
+      <button class="btn ${c.action === "verify" ? "primary" : ""}" data-act="verify">Đang xác minh thêm</button>
+      <button class="btn ${c.action === "hold" ? "primary" : ""}" data-act="hold">Tạm giữ giao dịch</button>
+      <button class="btn ${c.action === "transfer" ? "primary" : ""}" data-act="transfer">Chuyển chống gian lận</button>
     </div>
-    <h3>Chuyên viên chống gian lận</h3>
-    ${c.verdict ? `<p>Kết luận: ${c.verdict === "fraud" ? '<span class="lvl HIGH">Gian lận</span>' : '<span class="lvl LOW">Khách thật</span>'} ${c.verdict_note ? "· " + esc(c.verdict_note) : ""}</p>` : ""}
-    <textarea id="vnote" placeholder="Ghi chú điều tra (tùy chọn)">${esc(c.verdict_note || "")}</textarea>
-    <div class="acts"><button class="btn bad" data-ver="fraud">Gian lận, chặn số này</button><button class="btn good" data-ver="genuine">Khách thật</button></div>
+    <h3>Kết luận điều tra</h3>
+    ${c.verdict ? `<p style="margin:0 0 8px">${c.verdict === "fraud" ? '<span class="lvl HIGH">Gian lận</span>' : '<span class="lvl LOW">Khách thật</span>'} ${c.verdict_note ? esc(c.verdict_note) : ""}</p>` : ""}
+    <textarea id="vnote" placeholder="Ghi chú">${esc(c.verdict_note || "")}</textarea>
+    <div class="acts"><button class="btn bad" data-ver="fraud">Gian lận, chặn số</button><button class="btn good" data-ver="genuine">Khách thật</button></div>
     <h3>Thông tin</h3>
     <dl class="kv">
-      <dt>Số này đã gọi</dt><dd>${c.caller_history.calls} lần, ${c.caller_history.high} lần rủi ro cao</dd>
-      <dt>Danh sách</dt><dd>${c.caller_lists.length ? c.caller_lists.map(x => x === "blacklist" ? "blacklist" : "đã đăng ký").join(", ") : "chưa có"}</dd>
-      <dt>Mã bản ghi tổng đài</dt><dd>${esc(c.recording_ref) || "–"}</dd>
-      <dt>Điểm tổng hợp</dt><dd>${c.score == null ? "–" : c.score.toFixed(2)} (ngưỡng ${c.policy.t_medium.toFixed(2)} và ${c.policy.t_high.toFixed(2)})</dd>
-      <dt>Mã cuộc gọi</dt><dd><code>${c.id}</code></dd>
-    </dl>`;
+      <dt>Lịch sử số</dt><dd>${c.caller_history.calls} cuộc gọi, ${c.caller_history.high} rủi ro cao</dd>
+      <dt>Danh sách</dt><dd>${c.caller_lists.length ? c.caller_lists.map(x => x === "blacklist" ? "Blacklist" : "Đã đăng ký").join(", ") : "–"}</dd>
+      <dt>Mã ghi âm tổng đài</dt><dd>${esc(c.recording_ref) || "–"}</dd>
+      <dt>Điểm</dt><dd>${c.score == null ? "–" : c.score.toFixed(2)} (ngưỡng ${c.policy.t_medium.toFixed(2)} / ${c.policy.t_high.toFixed(2)})</dd>
+      <dt>Mã cuộc gọi</dt><dd>${c.id}</dd>
+    </dl></div>`;
   $("drawer").querySelector(".x").onclick = closeDrawer;
   if (c.recording) bindPlayer(c);
   $("drawer").querySelectorAll("[data-act]").forEach(b => b.onclick = async () => { await post(`/v1/calls/${c.id}/action`, {action:b.dataset.act}); refreshDrawer(); });
@@ -400,8 +411,8 @@ function playerHtml(c) {
         style="left:${100 * w.start / total}%;width:calc(${100 * Math.min(hop, w.end - w.start) / total}% - 2px)"
         title="${w.start.toFixed(0)}–${w.end.toFixed(0)} s: ${LEVEL[w.level].w}"></button>`).join("")}<div class="ph" id="ph"></div></div>
     <div class="ticks"><span>0 s</span><span>${(total / 2).toFixed(0)} s</span><span>${total.toFixed(0)} s</span></div>
-    ${suspects.length ? `<div class="suspects">${suspects.map(w => `<button class="btn sm" data-s="${w.start}" data-e="${w.end}">▶ ${w.start.toFixed(0)}–${w.end.toFixed(0)} s · ${LEVEL[w.level].w}</button>`).join("")}</div>`
-                      : `<p class="note">Không đoạn nào vượt ngưỡng.</p>`}`;
+    ${suspects.length ? `<div class="suspects">${suspects.map(w => `<button class="btn sm" data-s="${w.start}" data-e="${w.end}">▶ ${w.start.toFixed(0)}–${w.end.toFixed(0)} s</button>`).join("")}</div>`
+                      : ""}`;
 }
 function bindPlayer(c) {
   const a = $("recAudio"), total = Math.max(c.duration_s || 0, ...c.windows.map(w => w.end), 1);
@@ -419,6 +430,8 @@ function bindPlayer(c) {
     for (const c of live) { const d = await api(`/v1/calls/${c.id}`); active.set(c.id, d); }
     recent = await api("/v1/calls?status=ended&limit=12");
   } catch {}
+  const tick = () => { const d = new Date(), p = n => String(n).padStart(2, "0"); $("clock").textContent = `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())} ${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`; };
+  tick(); setInterval(tick, 1000);
   connect(); setView(); badges();
   setInterval(() => { if (view === "live") renderLive(); }, 1000);
 })();

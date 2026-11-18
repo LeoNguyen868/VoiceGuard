@@ -4,25 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>VoiceGuard</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
 <style>
   :root {
-    --bg:#f6f7f9; --card:#ffffff; --fg:#141a22; --muted:#5b6573; --line:#e3e7ec; --soft:#f0f2f5;
-    --accent:#2457c5; --accent-fg:#ffffff; --accent-soft:#e8eefb;
-    --ok:#1b7a3d; --ok-bg:#e7f5ec; --warn:#9a5a00; --warn-bg:#fdf1dd; --bad:#b4231a; --bad-bg:#fce9e7;
-    --wave:#c3cad4; --wave-played:#5b6573;
-    --radius:14px; --shadow:0 1px 2px rgba(20,26,34,.04), 0 4px 16px rgba(20,26,34,.06);
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg:#0f1318; --card:#171c23; --fg:#e8ebef; --muted:#9aa3ae; --line:#29303a; --soft:#1f252d;
-      --accent:#6c9cff; --accent-fg:#0b0f14; --accent-soft:#1b2740;
-      --ok:#5fd08a; --ok-bg:#132a1d; --warn:#f2b45a; --warn-bg:#33270f; --bad:#ff8579; --bad-bg:#3a1916;
-      --wave:#3a434f; --wave-played:#9aa3ae; --shadow:none;
-    }
+    --navy:#223671; --navy-soft:#e9edf7; --orange:#f26526; --orange-2:#d9531a;
+    --bg:#f5f6fc; --card:#ffffff; --fg:#212529; --muted:#6c757d; --line:#e9ecef; --soft:#f8f9fa;
+    --accent:#223671; --accent-fg:#ffffff; --accent-soft:#e9edf7;
+    --ok:#198754; --ok-bg:#e8f5ee; --warn:#b26a00; --warn-bg:#fff4e0; --bad:#d63031; --bad-bg:#fdecec;
+    --wave:#ced4da; --wave-played:#6c757d;
+    --radius:8px; --shadow:none;
   }
   * { box-sizing:border-box; }
   html, body { margin:0; background:var(--bg); color:var(--fg); }
-  body { font:16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { font:14px/1.5 Roboto, Arial, sans-serif; }
   button { font:inherit; color:inherit; }
   .wrap { max-width:760px; margin:0 auto; padding:28px 16px 48px; }
   header { display:flex; align-items:center; gap:12px; margin-bottom:6px; }
@@ -30,13 +24,14 @@
   header h1 { font-size:22px; margin:0; letter-spacing:-.01em; }
   .tagline { color:var(--muted); margin:0 0 24px; }
   .banner { font-size:14px; background:var(--warn-bg); color:var(--warn); border-radius:10px; padding:8px 12px; margin-bottom:16px; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:20px; margin-bottom:16px; }
-  .step { display:flex; align-items:baseline; gap:10px; margin:0 0 14px; font-size:17px; }
-  .step b { display:inline-grid; place-items:center; width:26px; height:26px; border-radius:50%; background:var(--accent-soft); color:var(--accent); font-size:14px; flex:none; }
-  .seg { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; background:var(--soft); padding:4px; border-radius:12px; margin-bottom:14px; }
-  .seg button { border:0; background:none; padding:9px 6px; border-radius:9px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; color:var(--muted); }
-  .seg button[aria-selected=true] { background:var(--card); color:var(--fg); font-weight:600; box-shadow:var(--shadow); }
-  .drop { display:flex; flex-direction:column; align-items:center; gap:6px; border:2px dashed var(--line); border-radius:12px; padding:28px 16px; text-align:center; color:var(--muted); cursor:pointer; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:16px; margin-bottom:12px; }
+  .step { display:flex; align-items:center; gap:10px; margin:0 0 12px; font-size:15px; font-weight:500; color:var(--navy); }
+  .step b { display:inline-grid; place-items:center; width:22px; height:22px; border-radius:4px; background:var(--navy); color:#fff; font-size:12px; flex:none; }
+  .seg { display:grid; grid-template-columns:repeat(3,1fr); border:1px solid var(--line); border-radius:8px; overflow:hidden; margin-bottom:12px; }
+  .seg button { border:0; background:#fff; padding:8px 6px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; color:var(--fg); }
+  .seg button + button { border-left:1px solid var(--line); }
+  .seg button[aria-selected=true] { background:var(--navy); color:#fff; }
+  .drop { display:flex; flex-direction:column; align-items:center; gap:6px; border:1px dashed #ced4da; border-radius:8px; padding:28px 16px; text-align:center; color:var(--muted); cursor:pointer; }
   .drop:hover, .drop.over { border-color:var(--accent); color:var(--fg); background:var(--accent-soft); }
   .drop strong { color:var(--fg); }
   .rec { display:flex; flex-direction:column; align-items:center; gap:10px; padding:16px 0 6px; }
@@ -46,7 +41,7 @@
   .hint { font-size:14px; color:var(--muted); text-align:center; margin:0; }
   .chips { display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; }
   .chips button { border:1px solid var(--line); background:var(--card); padding:4px 12px; border-radius:999px; cursor:pointer; font-size:14px; }
-  .chips button[aria-pressed=true] { background:var(--fg); color:var(--card); border-color:var(--fg); }
+  .chips button[aria-pressed=true] { background:var(--navy); color:#fff; border-color:var(--navy); }
   .samples { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:8px; max-height:300px; overflow:auto; }
   .sample { display:flex; align-items:center; gap:10px; text-align:left; border:1px solid var(--line); background:var(--card); border-radius:10px; padding:10px; cursor:pointer; }
   .sample:hover { border-color:var(--accent); }
@@ -57,7 +52,7 @@
   code { background:var(--soft); padding:1px 5px; border-radius:5px; font-size:13px; }
   .player { display:flex; align-items:center; gap:12px; margin-top:16px; padding:10px 12px; border:1px solid var(--line); border-radius:12px; }
   .player[hidden] { display:none; }
-  .play { flex:none; width:40px; height:40px; border-radius:50%; border:0; background:var(--fg); color:var(--card); cursor:pointer; display:grid; place-items:center; }
+  .play { flex:none; width:40px; height:40px; border-radius:50%; border:0; background:var(--navy); color:#fff; cursor:pointer; display:grid; place-items:center; }
   .wavebox { flex:1; min-width:0; }
   .wavebox .name { font-size:14px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:2px; }
   canvas.wave { width:100%; height:56px; display:block; cursor:pointer; }
@@ -68,18 +63,19 @@
   .src:disabled { opacity:.45; cursor:not-allowed; }
   .src svg { color:var(--accent); }
   .src span { font-size:13px; color:var(--muted); }
-  .cta { width:100%; margin-top:6px; padding:15px; border:0; border-radius:12px; background:var(--accent); color:var(--accent-fg); font-weight:700; font-size:17px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px; }
+  .cta { width:100%; padding:11px; border:0; border-radius:4px; background:var(--orange); color:#fff; font-weight:500; font-size:15px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px; }
+  .cta:hover { background:var(--orange-2); }
   .cta:disabled { opacity:.45; cursor:not-allowed; }
   .spin { width:18px; height:18px; border:2.5px solid currentColor; border-right-color:transparent; border-radius:50%; animation:r .8s linear infinite; }
   @keyframes r { to { transform:rotate(360deg); } }
-  .verdict { border-radius:var(--radius); padding:22px; margin-bottom:16px; display:grid; grid-template-columns:auto 1fr; gap:4px 16px; align-items:center; }
+  .verdict { border-radius:var(--radius); padding:16px 18px; margin-bottom:14px; display:grid; grid-template-columns:auto 1fr; gap:4px 16px; align-items:center; }
   .verdict.LOW { background:var(--ok-bg); color:var(--ok); }
   .verdict.MEDIUM { background:var(--warn-bg); color:var(--warn); }
   .verdict.HIGH { background:var(--bad-bg); color:var(--bad); }
   .verdict svg { grid-row:span 2; }
-  .verdict h2 { margin:0; font-size:26px; line-height:1.2; letter-spacing:-.01em; }
+  .verdict h2 { margin:0; font-size:22px; line-height:1.2; font-weight:700; }
   .verdict p { margin:0; color:var(--fg); }
-  .verdict .pct { grid-row:span 2; font-size:44px; font-weight:800; line-height:1; letter-spacing:-.02em; text-align:right; }
+  .verdict .pct { grid-row:span 2; font-size:38px; font-weight:700; line-height:1; letter-spacing:-.02em; text-align:right; }
   .verdict .pct small { display:block; font-size:13px; font-weight:600; letter-spacing:0; opacity:.85; }
   .verdict.has-pct { grid-template-columns:auto 1fr auto; }
   @media (max-width:520px) {
@@ -94,7 +90,7 @@
   .gauge .labels { display:flex; justify-content:space-between; font-size:13px; color:var(--muted); margin-top:6px; }
   .todo { margin:0; padding-left:20px; }
   .todo li { margin:4px 0; }
-  h3 { font-size:15px; margin:18px 0 8px; }
+  h3 { font-size:14px; font-weight:500; color:var(--navy); margin:16px 0 6px; padding-bottom:4px; border-bottom:1px solid var(--line); }
   .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:13px; color:var(--muted); margin-top:6px; }
   .legend i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
   .linkbtn { border:0; background:none; color:var(--accent); cursor:pointer; padding:0; font-weight:600; }
@@ -137,7 +133,7 @@
   <!-- Bước 1 -->
   <div class="cols"><div class="colL">
   <section class="card" aria-labelledby="s1">
-    <h2 class="step" id="s1"><b>1</b>Chọn đoạn âm thanh</h2>
+    <h2 class="step" id="s1"><b>1</b>Âm thanh</h2>
     <div class="seg" role="tablist">
       <button role="tab" aria-selected="true" data-tab="up"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 16V4m0 0-4 4m4-4 4 4M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>Tải tệp</button>
       <button role="tab" aria-selected="false" data-tab="rec"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>Ghi âm</button>
@@ -146,8 +142,8 @@
     <div data-panel="up">
       <label class="drop" id="drop">
         <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 16V4m0 0-4 4m4-4 4 4M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
-        <span><strong>Kéo thả tệp vào đây</strong> hoặc bấm để chọn</span>
-        <span style="font-size:13px">Tin nhắn thoại, bản ghi cuộc gọi: mp3, m4a, ogg, wav...</span>
+        <span><strong>Kéo thả tệp</strong> hoặc bấm để chọn</span>
+        <span style="font-size:12px">mp3, m4a, ogg, wav</span>
         <input id="file" type="file" accept="audio/*,video/*" class="visually-hidden">
       </label>
     </div>
@@ -169,11 +165,11 @@
 
   <!-- Bước 2 -->
   <section class="card" aria-labelledby="s2">
-    <h2 class="step" id="s2"><b>2</b>Đoạn âm thanh đến từ đâu?</h2>
+    <h2 class="step" id="s2"><b>2</b>Nguồn cuộc gọi</h2>
     <div class="sources" id="sources"></div>
   </section>
 
-  <button class="cta" id="go" disabled>Kiểm tra giọng nói</button>
+  <button class="cta" id="go" disabled>Kiểm tra</button>
 
   </div>
   <div class="colR"><div id="result"></div></div>
@@ -210,9 +206,7 @@ const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;
 let health = null, samples = [], labSel = "all", current = null, channel = "none", last = null, peaks = null, levels = null;
 const audio = $("audio");
 
-const PLACEHOLDER = `<section class="card placeholder"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z"/></svg>
-  <div><b style="color:var(--fg)">Kết quả hiện ở đây</b></div><div>Chọn âm thanh và bấm Kiểm tra giọng nói.</div></section>`;
-function clearResult() { $("result").innerHTML = document.body.classList.contains("embed") ? PLACEHOLDER : ""; }
+function clearResult() { $("result").innerHTML = ""; }
 clearResult();
 
 // ---------- trạng thái máy chủ ----------
@@ -367,16 +361,15 @@ function render(d) {
   }
   $("result").innerHTML = `
     <section class="card" aria-live="polite">
-      <div class="verdict has-pct ${d.risk_level}">${v.icon}<h2>${v.title}</h2><div class="pct">${pctText}</div><p>${v.text}</p></div>
+      <div class="verdict has-pct ${d.risk_level}">${v.icon}<h2>${v.title}</h2><div class="pct">${pctText}</div></div>
       <div class="gauge" aria-hidden="true">
         <div class="bar"><div class="dot" style="left:${Math.min(97, Math.max(3, 100 - fake)).toFixed(1)}%"></div></div>
         <div class="labels"><span>Giả 100%</span><span>50%</span><span>Thật 100%</span></div>
       </div>
-      <h3>Nên làm gì</h3>
+      <h3>Xử lý</h3>
       <ul class="todo">${v.todo.map(t => `<li>${t}</li>`).join("")}</ul>
-      ${d.segments.length > 1 ? `<h3>Đoạn nào đáng ngờ</h3>
-        <p style="margin:0">${sus ? `${sus}/${d.segments.length} đoạn 4 giây có dấu hiệu bất thường, được tô màu trên dạng sóng ở trên.`
-          : "Không đoạn nào có dấu hiệu bất thường."}
+      ${d.segments.length > 1 ? `<h3>Đoạn bất thường</h3>
+        <p style="margin:0">${sus ? `${sus}/${d.segments.length} đoạn bất thường` : "Không có đoạn bất thường"}
           ${worst && lvl(worst.score, p) !== "LOW" ? `<button class="linkbtn" id="playWorst">Nghe đoạn đáng ngờ nhất (${worst.start.toFixed(0)}–${worst.end.toFixed(0)} s)</button>` : ""}</p>
         <div class="legend"><span><i style="background:var(--ok)"></i>Bình thường</span><span><i style="background:var(--warn)"></i>Chưa chắc chắn</span><span><i style="background:var(--bad)"></i>Giống giọng giả</span></div>` : ""}
       ${truth}
@@ -396,17 +389,16 @@ function render(d) {
         <p style="margin-top:12px"><button class="linkbtn" id="cmp">So sánh kết quả qua các kênh gọi</button></p>
         <div id="cmpOut"></div>
       </details>
-      <p class="note">Kết quả hỗ trợ quyết định và có thể sai.</p>
     </section>`;
   if ($("playWorst")) $("playWorst").onclick = () => playRange(worst.start, worst.end);
   $("cmp").onclick = compare;
 }
 
 $("go").onclick = async () => {
-  const b = $("go"); b.disabled = true; b.innerHTML = `<span class="spin"></span>Đang kiểm tra...`;
+  const b = $("go"); b.disabled = true; b.innerHTML = `<span class="spin"></span>Đang kiểm tra`;
   try { render(await analyze(channel)); if (innerWidth < 980 || !document.body.classList.contains("embed")) $("result").scrollIntoView({behavior:"smooth", block:"start"}); }
   catch (e) { $("result").innerHTML = `<section class="card"><p class="err">${esc(e.message)}</p></section>`; }
-  b.disabled = false; b.textContent = "Kiểm tra giọng nói";
+  b.disabled = false; b.textContent = "Kiểm tra";
 };
 
 async function compare() {

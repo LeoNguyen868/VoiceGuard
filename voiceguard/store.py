@@ -5,6 +5,7 @@ blacklist and count repeat callers) and a masked form for display ("0912***678")
 is kept for review as a WAV file (see api.py, VG_RECORD); the table only holds whether it exists.
 """
 import hashlib
+import hmac
 import os
 import secrets
 import sqlite3
@@ -27,6 +28,10 @@ CREATE INDEX IF NOT EXISTS calls_started ON calls(started_at);
 CREATE INDEX IF NOT EXISTS calls_caller ON calls(caller_key);
 CREATE TABLE IF NOT EXISTS windows (call_id TEXT, start REAL, end REAL, score REAL, level TEXT, latency_ms REAL);
 CREATE INDEX IF NOT EXISTS windows_call ON windows(call_id);
+CREATE TABLE IF NOT EXISTS users (
+  username TEXT PRIMARY KEY, full_name TEXT, pw_salt TEXT, pw_hash TEXT, created_at REAL, disabled INTEGER DEFAULT 0,
+  last_login REAL);
+CREATE TABLE IF NOT EXISTS sessions (token TEXT PRIMARY KEY, username TEXT, created_at REAL, expires_at REAL);
 CREATE TABLE IF NOT EXISTS numbers (
   key TEXT, list TEXT, masked TEXT, added_at REAL, source TEXT, note TEXT, PRIMARY KEY (key, list));
 """
@@ -61,6 +66,78 @@ class Store:
                 self.db.commit()
             else:
                 self.salt = row["v"]
+
+    # ---------- users and sessions ----------
+    PBKDF2_ITERATIONS = 200_000
+
+    def _hash(self, password, salt):
+        return hashlib.pbkdf2_hmac("sha256", password.encode(), bytes.fromhex(salt), self.PBKDF2_ITERATIONS).hex()
+
+    def set_user(self, username, password=None, full_name=None, disabled=None):
+        """Create a user, or update the given fields of an existing one."""
+        username = username.strip().lower()
+        with self.lock:
+            row = self.db.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
+            if row is None:
+                if not password:
+                    raise ValueError("tài khoản mới cần mật khẩu")
+                salt = secrets.token_hex(16)
+                self.db.execute("INSERT INTO users (username, full_name, pw_salt, pw_hash, created_at) VALUES (?,?,?,?,?)",
+                                (username, full_name or username, salt, self._hash(password, salt), time.time()))
+            else:
+                if password:
+                    salt = secrets.token_hex(16)
+                    self.db.execute("UPDATE users SET pw_salt=?, pw_hash=? WHERE username=?", (salt, self._hash(password, salt), username))
+                    self.db.execute("DELETE FROM sessions WHERE username=?", (username,))
+                for k, v in (("full_name", full_name), ("disabled", disabled)):
+                    if v is not None:
+                        self.db.execute(f"UPDATE users SET {k}=? WHERE username=?", (v, username))
+                if disabled:
+                    self.db.execute("DELETE FROM sessions WHERE username=?", (username,))
+            self.db.commit()
+
+    def count_users(self):
+        with self.lock:
+            return self.db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+
+    def users(self):
+        with self.lock:
+            return [dict(r) for r in self.db.execute(
+                "SELECT username, full_name, created_at, disabled, last_login FROM users ORDER BY username")]
+
+    def check_password(self, username, password):
+        """The user's public fields when the password matches and the account is active, else None."""
+        with self.lock:
+            row = self.db.execute("SELECT * FROM users WHERE username=?", ((username or "").strip().lower(),)).fetchone()
+        if row is None:
+            self._hash(password or "", "00" * 16)                        # same work for unknown users
+            return None
+        if row["disabled"] or not hmac.compare_digest(self._hash(password or "", row["pw_salt"]), row["pw_hash"]):
+            return None
+        return dict(username=row["username"], full_name=row["full_name"])
+
+    def new_session(self, username, hours=12):
+        token = secrets.token_urlsafe(32)
+        now = time.time()
+        with self.lock:
+            self.db.execute("INSERT INTO sessions VALUES (?,?,?,?)", (token, username, now, now + hours * 3600))
+            self.db.execute("UPDATE users SET last_login=? WHERE username=?", (now, username))
+            self.db.execute("DELETE FROM sessions WHERE expires_at<?", (now,))
+            self.db.commit()
+        return token
+
+    def session_user(self, token):
+        if not token:
+            return None
+        with self.lock:
+            row = self.db.execute("SELECT u.username, u.full_name FROM sessions s JOIN users u ON u.username=s.username "
+                                  "WHERE s.token=? AND s.expires_at>? AND u.disabled=0", (token, time.time())).fetchone()
+        return dict(row) if row else None
+
+    def end_session(self, token):
+        with self.lock:
+            self.db.execute("DELETE FROM sessions WHERE token=?", (token,))
+            self.db.commit()
 
     # ---------- numbers ----------
     def key(self, number):

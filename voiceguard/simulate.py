@@ -6,7 +6,9 @@ library (samples/manifest.json, spoofed clips go to fraudster calls more often) 
 The clip is passed through the line's codec with ffmpeg, then sent as 16 kHz 16-bit PCM in chunks at
 the speed of speech, exactly as a PBX connector would.
 
-  python -m voiceguard.simulate --url http://localhost:8000 --calls 20 --duration 30
+  VG_API_KEY=<key> python -m voiceguard.simulate --url http://localhost:8000 --calls 20 --duration 30
+
+The service must run with the same VG_API_KEY: the simulator authenticates as the PBX connector.
 """
 import argparse
 import json
@@ -14,6 +16,7 @@ import os
 import random
 import threading
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -25,10 +28,15 @@ from .channel import apply_channel, available_channels
 LINES = [("opus12", 0.35), ("amrnb", 0.3), ("amrwb", 0.15), ("g711u", 0.2)]
 
 
+API_KEY = os.environ.get("VG_API_KEY", "")
+
+
 def http(url, data=None, body=None, method="POST"):
     if data is not None:
         body = urllib.parse.urlencode(data).encode()
     req = urllib.request.Request(url, data=body, method=method)
+    if API_KEY:
+        req.add_header("Authorization", f"Bearer {API_KEY}")
     if data is None and body is not None:
         req.add_header("Content-Type", "application/octet-stream")
     with urllib.request.urlopen(req, timeout=30) as r:
@@ -92,6 +100,7 @@ def main():
     ap.add_argument("--spoof_share", type=float, default=0.1, help="share of non-fraudster calls with a spoofed clip")
     ap.add_argument("--samples", default="samples", help="sample library (manifest.json); empty = synthetic audio")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--user", default="", help="console account that registers the simulated customers (password in VG_SIM_PASSWORD)")
     args = ap.parse_args()
     rng = np.random.default_rng(args.seed)
     random.seed(args.seed)
@@ -103,8 +112,14 @@ def main():
     clips = json.load(open(manifest, encoding="utf-8")) if os.path.exists(manifest) else []
     # Number pools: some registered customers and a few repeat fraudsters (not blacklisted yet).
     pools = dict(registered=[phone(rng) for _ in range(30)], fraudster=[phone(rng) for _ in range(3)], unknown=[])
-    for n in pools["registered"]:
-        http(f"{args.url}/v1/numbers", dict(number=n, list="registered", note="khách hàng mô phỏng"))
+    if args.user:                                                            # number lists need a console account
+        jar = urllib.request.build_opener(urllib.request.HTTPCookieProcessor())
+        jar.open(f"{args.url}/v1/auth/login", urllib.parse.urlencode(
+            dict(username=args.user, password=os.environ.get("VG_SIM_PASSWORD", ""))).encode())
+        for n in pools["registered"]:
+            jar.open(f"{args.url}/v1/numbers", urllib.parse.urlencode(dict(number=n, list="registered", note="Khách hàng")).encode())
+    else:
+        pools["registered"] = []
     print(f"{args.calls} calls, {len(clips) or 'synthetic'} clips, {args.duration:.0f} s each, url {args.url}")
     stats, lock, threads = {}, threading.Lock(), []
     sem = threading.Semaphore(args.concurrent or args.calls)

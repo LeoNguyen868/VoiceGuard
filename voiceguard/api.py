@@ -19,6 +19,11 @@ Environment variables:
   VG_RECORD      flagged (default): keep the audio of calls that reached MEDIUM or HIGH, for review;
                  all: keep every call; none: keep no audio
   VG_RECORD_DAYS recordings older than this are deleted at start-up (default 30)
+  VG_API_KEY     key of the PBX connector ("Authorization: Bearer <key>") for /v1/calls and /v1/analyze
+  VG_ADMIN_PASSWORD  password of the first admin account, created when the database has no user; without it a
+                 random password is written to data/admin-password.txt
+  VG_SESSION_HOURS   console session lifetime (default 12)
+Console users log in at /login; python -m voiceguard.users adds, lists, locks accounts and changes passwords.
   VG_AUDIT_LOG   JSONL audit log path (default: logs/audit.jsonl); it holds no audio and no phone number.
   VG_CUDA_GRAPH=1    replay CUDA Graphs for 4 s windows (GPU only)
   VG_BATCH=0         run each request alone instead of batching windows across requests and calls
@@ -35,6 +40,8 @@ Run: uvicorn voiceguard.api:app --host 0.0.0.0 --port 8000
 """
 import asyncio
 import hashlib
+import hmac
+import secrets
 import json
 import os
 import tempfile
@@ -48,9 +55,9 @@ from pathlib import Path
 
 import numpy as np
 import torch
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Response, UploadFile
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .audio import SR, load_audio, repeat_pad, rms_dbfs
@@ -204,25 +211,113 @@ def _webhook(event):
     threading.Thread(target=send, daemon=True).start()
 
 
+# ---------------------------------------------------------------- authentication
+
+COOKIE = "vg_session"
+_fails = {}
+
+
+def _current(request):
+    """Logged-in console user, or the PBX connector when the request carries VG_API_KEY, else None."""
+    u = _store().session_user(request.cookies.get(COOKIE))
+    if u:
+        return u
+    key, hdr = os.environ.get("VG_API_KEY"), request.headers.get("authorization", "")
+    if key and hmac.compare_digest(hdr.encode(), f"Bearer {key}".encode()):
+        return dict(username="pbx", full_name="Kết nối tổng đài", connector=True)
+    return None
+
+
+def need(connector=False):
+    """Dependency: a logged-in console user, or also the PBX connector when connector is True."""
+    def dep(request: Request):
+        u = _current(request)
+        if u is None:
+            raise HTTPException(401, "Chưa đăng nhập")
+        if u.get("connector") and not connector:
+            raise HTTPException(403, "Khóa kết nối tổng đài không dùng được cho chức năng này")
+        return u
+    return dep
+
+
+def _bootstrap_admin():
+    st = _store()
+    if st.count_users():
+        return
+    pw = os.environ.get("VG_ADMIN_PASSWORD")
+    if not pw:
+        pw = secrets.token_urlsafe(12)
+        f = ROOT / "data" / "admin-password.txt"
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text(pw + "\n", encoding="utf-8")
+        os.chmod(f, 0o600)
+        print(f"VoiceGuard: created user 'admin'; its password is in {f}")
+    st.set_user("admin", pw, "Quản trị hệ thống")
+
+
+@app.get("/login")
+def login_page(request: Request):
+    if _store().session_user(request.cookies.get(COOKIE)):
+        return RedirectResponse("/", 303)
+    return FileResponse(STATIC / "login.html", headers={"Cache-Control": "no-cache"})
+
+
+@app.post("/v1/auth/login")
+def login(response: Response, request: Request, username: str = Form(...), password: str = Form(...)):
+    name = username.strip().lower()
+    n, t0 = _fails.get(name, (0, time.time()))
+    if time.time() - t0 > 300:
+        n, t0 = 0, time.time()
+    if n >= 5:
+        raise HTTPException(429, "Đăng nhập sai quá nhiều lần, thử lại sau 5 phút")
+    u = _store().check_password(name, password)
+    if u is None:
+        _fails[name] = (n + 1, t0)
+        raise HTTPException(401, "Sai tài khoản hoặc mật khẩu")
+    _fails.pop(name, None)
+    hours = float(os.environ.get("VG_SESSION_HOURS", 12))
+    token = _store().new_session(u["username"], hours)
+    response.set_cookie(COOKIE, token, max_age=int(hours * 3600), httponly=True, samesite="strict",
+                        secure=request.url.scheme == "https")
+    return u
+
+
+@app.post("/v1/auth/logout")
+def logout(response: Response, request: Request):
+    _store().end_session(request.cookies.get(COOKIE))
+    response.delete_cookie(COOKIE)
+    return dict(ok=True)
+
+
+@app.get("/v1/auth/me")
+def me(user=Depends(need())):
+    return user
+
+
 @app.on_event("startup")
 def _startup():
     _get()
     _store()
+    _bootstrap_admin()
     _purge_recordings()
 
 
 @app.get("/")
-def console():
+def console(request: Request):
+    if not _store().session_user(request.cookies.get(COOKIE)):
+        return RedirectResponse("/login", 303)
     return FileResponse(STATIC / "console.html", headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/check")
-def check_page():
+def check_page(request: Request):
+    if not _store().session_user(request.cookies.get(COOKIE)):
+        return RedirectResponse("/login", 303)
     return FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/v1/samples")
-def samples():
+def samples(user=Depends(need())):
     """Sample clips for the web interface (manifest.json written by python -m voiceguard.samples)."""
     f = SAMPLES / "manifest.json"
     if not f.exists():
@@ -251,7 +346,7 @@ def health():
 
 @app.post("/v1/analyze")
 async def analyze(file: UploadFile = File(...), mode: str = Form("window"),
-                  channel: str = Form("none"), caller_number: str = Form("")):
+                  channel: str = Form("none"), caller_number: str = Form(""), user=Depends(need(connector=True))):
     if mode not in ("window", "full"):
         raise HTTPException(422, "mode phải là 'window' hoặc 'full'")
     if channel not in CHANNELS:
@@ -361,7 +456,7 @@ def _after_decision(call, dec):
 
 @app.post("/v1/calls")
 async def open_call(caller_number: str = Form(""), channel: str = Form("none"), agent: str = Form(""),
-                    recording_ref: str = Form("")):
+                    recording_ref: str = Form(""), user=Depends(need(connector=True))):
     """Open a call. channel is the line's codec (the audio arrives already through it), so it selects
     the channel's thresholds; it is not simulated."""
     _get()
@@ -379,7 +474,7 @@ async def open_call(caller_number: str = Form(""), channel: str = Form("none"), 
 
 
 @app.post("/v1/calls/{call_id}/audio")
-async def call_audio(call_id: str, request: Request):
+async def call_audio(call_id: str, request: Request, user=Depends(need(connector=True))):
     """Body: raw 16 kHz mono signed 16-bit PCM. Scores every new full window (4 s, hop 2 s)."""
     det = _get()
     call = _state["calls"].get(call_id)
@@ -426,7 +521,7 @@ async def call_audio(call_id: str, request: Request):
 
 
 @app.post("/v1/calls/{call_id}/end")
-async def end_call(call_id: str):
+async def end_call(call_id: str, user=Depends(need(connector=True))):
     det = _get()
     call = _state["calls"].pop(call_id, None)
     if call is None:
@@ -452,7 +547,7 @@ async def end_call(call_id: str):
 # ---------------------------------------------------------------- console API
 
 @app.get("/v1/events")
-async def events(request: Request):
+async def events(request: Request, user=Depends(need())):
     """Server-sent events: call_started, call_update, alert, call_ended, action, verdict, numbers."""
     q = asyncio.Queue()
     BUS.subs.add(q)
@@ -475,7 +570,7 @@ async def events(request: Request):
 
 @app.get("/v1/calls")
 def list_calls(status: str = None, min_level: str = None, unreviewed: bool = False, limit: int = 100,
-               hours: float = None):
+               hours: float = None, user=Depends(need())):
     if min_level and min_level not in LEVELS:
         raise HTTPException(422, "min_level phải là LOW, MEDIUM hoặc HIGH")
     since = time.time() - hours * 3600 if hours else None
@@ -483,7 +578,7 @@ def list_calls(status: str = None, min_level: str = None, unreviewed: bool = Fal
 
 
 @app.get("/v1/calls/{call_id}/recording")
-def call_recording(call_id: str):
+def call_recording(call_id: str, user=Depends(need())):
     """The call's audio (16 kHz mono WAV), kept for flagged calls only (VG_RECORD)."""
     f = _rec_dir() / f"{call_id}.wav"
     if not f.exists():
@@ -492,7 +587,7 @@ def call_recording(call_id: str):
 
 
 @app.get("/v1/calls/{call_id}")
-def get_call(call_id: str):
+def get_call(call_id: str, user=Depends(need())):
     c = _store().get_call(call_id)
     if c is None:
         raise HTTPException(404, "Không tìm thấy thông tin cuộc gọi")
@@ -505,13 +600,13 @@ ACTIONS = {"continue": "Đã xác minh · Tiếp tục giao dịch", "verify": "
 
 
 @app.post("/v1/calls/{call_id}/action")
-def call_action(call_id: str, action: str = Form(...), agent: str = Form("")):
+def call_action(call_id: str, action: str = Form(...), user=Depends(need())):
     """An agent's action on a call; hold and transfer are sent to the webhook (CRM, core banking)."""
     if action not in ACTIONS:
         raise HTTPException(422, f"action phải thuộc {list(ACTIONS)}")
     if _store().get_call(call_id) is None:
         raise HTTPException(404, "Không tìm thấy thông tin cuộc gọi")
-    _store().update_call(call_id, action=action, action_at=time.time(), **({"agent": agent} if agent else {}))
+    _store().update_call(call_id, action=action, action_at=time.time(), agent=user["username"])
     ev = dict(type="action", call=_store().get_call(call_id))
     BUS.publish(ev)
     if action in ("hold", "transfer"):
@@ -520,13 +615,13 @@ def call_action(call_id: str, action: str = Form(...), agent: str = Form("")):
 
 
 @app.post("/v1/calls/{call_id}/verdict")
-def call_verdict(call_id: str, verdict: str = Form(...), note: str = Form(""), analyst: str = Form("")):
+def call_verdict(call_id: str, verdict: str = Form(...), note: str = Form(""), user=Depends(need())):
     """Fraud analyst's conclusion. Confirmed fraud blacklists the caller (when the number was given)."""
     if verdict not in ("fraud", "genuine"):
         raise HTTPException(422, "verdict phải là 'fraud' hoặc 'genuine'")
     if _store().get_call(call_id) is None:
         raise HTTPException(404, "Không tìm thấy thông tin cuộc gọi")
-    _store().update_call(call_id, verdict=verdict, verdict_note=note, verdict_by=analyst, verdict_at=time.time())
+    _store().update_call(call_id, verdict=verdict, verdict_note=note, verdict_by=user["username"], verdict_at=time.time())
     key, masked = _store().caller_key_of(call_id)
     if verdict == "fraud" and key:
         _store().add_number(key=key, masked=masked, lst="blacklist", source=f"Xác nhận gian lận từ cuộc gọi {call_id[:8]}",
@@ -538,7 +633,7 @@ def call_verdict(call_id: str, verdict: str = Form(...), note: str = Form(""), a
 
 
 @app.get("/v1/numbers")
-def list_numbers(list: str = "blacklist"):
+def list_numbers(list: str = "blacklist", user=Depends(need())):
     if list == "suggested":
         return _store().suggestions()
     if list not in ("blacklist", "registered"):
@@ -547,7 +642,8 @@ def list_numbers(list: str = "blacklist"):
 
 
 @app.post("/v1/numbers")
-def add_number(number: str = Form(""), list: str = Form("blacklist"), note: str = Form(""), key: str = Form("")):
+def add_number(number: str = Form(""), list: str = Form("blacklist"), note: str = Form(""), key: str = Form(""),
+               user=Depends(need())):
     """Add a number by its digits, or a suggested caller by its key."""
     if list not in ("blacklist", "registered"):
         raise HTTPException(422, "list phải là blacklist hoặc registered")
@@ -564,7 +660,7 @@ def add_number(number: str = Form(""), list: str = Form("blacklist"), note: str 
 
 
 @app.delete("/v1/numbers/{key}")
-def remove_number(key: str, list: str = "blacklist"):
+def remove_number(key: str, list: str = "blacklist", user=Depends(need())):
     if not _store().remove_number(key, list):
         raise HTTPException(404, "Số điện thoại không có trong danh sách")
     BUS.publish(dict(type="numbers"))
@@ -572,7 +668,7 @@ def remove_number(key: str, list: str = "blacklist"):
 
 
 @app.get("/v1/stats")
-def stats(hours: float = 24):
+def stats(hours: float = 24, user=Depends(need())):
     out = _store().stats(time.time() - hours * 3600)
     out["open_calls"] = len(_state.get("calls", {}))
     out["hours"] = hours

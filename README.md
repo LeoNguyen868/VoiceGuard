@@ -44,18 +44,20 @@ python -m voiceguard.convert assemble --base weights/nes2netx_itw_vg.pt --head w
 
 ## Hệ thống cho tổng đài
 
-| Đối tượng | Màn hình (`http://<máy chủ>:8000/`) |
+| Công việc | Màn hình (`http://<máy chủ>:8000/`) |
 |---|---|
-| Nhân viên tổng đài | **Cuộc gọi trực tiếp:** mức rủi ro và khả năng giả của từng cuộc gọi, cập nhật mỗi 2 giây; cuộc gọi rủi ro cao lên đầu, có âm báo; nút xác minh, tạm giữ giao dịch, chuyển chống gian lận |
-| Chuyên viên chống gian lận | **Hàng đợi điều tra:** cuộc gọi cần xác minh hoặc rủi ro cao đã kết thúc; kết luận gian lận (tự đưa số vào blacklist) hoặc khách thật<br>**Danh sách số:** blacklist, số đã đăng ký, số được đề xuất chặn (gọi tới nhiều lần ở mức rủi ro cao) |
+| Theo dõi cuộc gọi | **Cuộc gọi trực tiếp:** mức rủi ro và khả năng giả của từng cuộc gọi, cập nhật mỗi 2 giây; cuộc gọi rủi ro cao lên đầu, có âm báo; nút xác minh, tạm giữ giao dịch, chuyển chống gian lận |
+| Điều tra | **Hàng đợi điều tra:** cuộc gọi cần xác minh hoặc rủi ro cao đã kết thúc; kết luận gian lận (tự đưa số vào blacklist) hoặc khách thật<br>**Danh sách số:** blacklist, số đã đăng ký, số được đề xuất chặn (gọi tới nhiều lần ở mức rủi ro cao) |
 | Giám sát | **Tổng quan:** số cuộc gọi, cảnh báo, chặn, gian lận đã xác nhận, tỷ lệ cảnh báo nhầm, độ trễ |
-| Mọi người | **Kiểm tra tệp:** tải lên tin nhắn thoại hoặc bản ghi để kiểm tra (cũng mở riêng ở `/check`) |
+| Kiểm tra tệp | Tải lên tin nhắn thoại hoặc bản ghi để kiểm tra (cũng mở riêng ở `/check`) |
 
 - **Luồng:** tổng đài mở phiên cho mỗi cuộc gọi (`POST /v1/calls` với số gọi đến và kênh của đường dây), gửi âm thanh PCM 16 kHz theo từng đoạn và đóng phiên khi cúp máy. Mọi bước được lưu vào SQLite (`VG_DB`) và đẩy tới các màn hình qua `GET /v1/events` (server-sent events).
 - **Nghe lại:** âm thanh của cuộc gọi cần xác minh hoặc rủi ro cao được giữ dạng WAV (`data/recordings/`) để chuyên viên nghe lại; trong ngăn chi tiết, thanh thời gian tô màu theo từng đoạn 4 giây, bấm để nghe đúng đoạn đó. Cuộc gọi bình thường không được lưu âm thanh. `VG_RECORD=flagged|all|none`, `VG_RECORD_DAYS` (mặc định 30 ngày).
 - **Dữ liệu cá nhân:** số điện thoại chỉ được lưu dưới dạng mã băm có salt và dạng đã che; giọng nói là dữ liệu sinh trắc học nên chỉ giữ ở cuộc gọi bị gắn cờ và xóa sau thời hạn.
 - **Webhook:** `VG_WEBHOOK_URL` nhận JSON khi một cuộc gọi lên mức rủi ro cao hoặc khi nhân viên tạm giữ, chuyển cuộc gọi (để CRM hoặc core banking giữ giao dịch).
-- **Mô phỏng tổng đài:** `python -m voiceguard.simulate --url http://localhost:8000 --calls 20` mở 20 cuộc gọi đồng thời, phát âm thanh của thư viện mẫu qua codec của từng đường dây với tốc độ thật.
+- **Đăng nhập:** bảng điều khiển mở ở `/login`. Lần chạy đầu tạo tài khoản `admin` với mật khẩu `VG_ADMIN_PASSWORD` (không đặt thì mật khẩu ngẫu nhiên được ghi vào `data/admin-password.txt`). Mọi tài khoản dùng được toàn bộ màn hình; thêm, khóa tài khoản và đổi mật khẩu bằng `python -m voiceguard.users add|list|passwd|disable|enable`. Phiên đăng nhập là cookie HttpOnly hết hạn sau `VG_SESSION_HOURS` giờ (mặc định 12); sai mật khẩu 5 lần trong 5 phút thì tài khoản bị tạm chặn.
+- **Kết nối tổng đài:** PBX gọi các API cuộc gọi với `Authorization: Bearer <VG_API_KEY>`; khóa này chỉ mở được luồng cuộc gọi và `/v1/analyze`, không đọc được lịch sử.
+- **Mô phỏng tổng đài:** `VG_API_KEY=<khóa> VG_SIM_PASSWORD=<mật khẩu> python -m voiceguard.simulate --url http://localhost:8000 --calls 20 --user admin` mở 20 cuộc gọi đồng thời, phát âm thanh của thư viện mẫu qua codec của từng đường dây với tốc độ thật; `--user` dùng để đăng ký sẵn số khách hàng.
 
 ## Chạy dịch vụ
 

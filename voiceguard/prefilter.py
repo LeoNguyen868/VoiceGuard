@@ -7,11 +7,11 @@ registered customer numbers are still screened, because caller ID can be spoofed
 import re
 
 RULES = {
-    "blacklist": "Số nằm trong blacklist: tạm dừng giao dịch, chuyển bộ phận chống gian lận",
-    "registered": "Số đã đăng ký của khách hàng: áp dụng chính sách rủi ro chuẩn",
-    "unknown": "Số chưa có trong danh sách khách hàng: mức rủi ro tối thiểu là MEDIUM",
-    "hidden": "Số bị ẩn: mức rủi ro tối thiểu là MEDIUM",
-    "not_provided": "Không có thông tin số gọi đến: áp dụng chính sách rủi ro chuẩn",
+    "blacklist": "Số thuê bao nằm trong danh sách đen: tạm dừng giao dịch, chuyển bộ phận phòng chống gian lận",
+    "registered": "Số thuê bao đã định danh: áp dụng quy trình kiểm soát tiêu chuẩn",
+    "unknown": "Số lạ chưa có trong danh bạ khách hàng: áp dụng mức rủi ro tối thiểu Cần xác minh (MEDIUM)",
+    "hidden": "Thuê bao ẩn số danh tính: áp dụng mức rủi ro tối thiểu Cần xác minh (MEDIUM)",
+    "not_provided": "Không xác định được số gọi đến: áp dụng quy trình kiểm soát tiêu chuẩn",
 }
 
 

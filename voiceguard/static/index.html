@@ -126,23 +126,23 @@
   <header>
     <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z" fill="var(--accent)"/><path d="M8 12h1m2-3v6m2-4v2m2-3v4" stroke="var(--accent-fg)" stroke-width="1.8" stroke-linecap="round"/></svg>
     <h1>VoiceGuard</h1>
-    <a href="/" style="margin-left:auto;color:var(--accent);text-decoration:none;font-weight:600;font-size:14px">← Bảng điều khiển tổng đài</a>
+    <a href="/" style="margin-left:auto;color:var(--accent);text-decoration:none;font-weight:600;font-size:14px">← Màn hình giám sát tổng đài</a>
   </header>
-  <p class="tagline">Kiểm tra một đoạn giọng nói là của người thật hay do AI nhân bản.</p>
+  <p class="tagline">Kiểm tra và phát hiện giọng nói người thật hay giả mạo bằng AI (Deepfake voice).</p>
 
   <!-- Bước 1 -->
   <div class="cols"><div class="colL">
   <section class="card" aria-labelledby="s1">
-    <h2 class="step" id="s1"><b>1</b>Âm thanh</h2>
+    <h2 class="step" id="s1"><b>1</b>Mẫu âm thanh</h2>
     <div class="seg" role="tablist">
-      <button role="tab" aria-selected="true" data-tab="up"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 16V4m0 0-4 4m4-4 4 4M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>Tải tệp</button>
-      <button role="tab" aria-selected="false" data-tab="rec"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>Ghi âm</button>
-      <button role="tab" aria-selected="false" data-tab="lib"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>Mẫu thử</button>
+      <button role="tab" aria-selected="true" data-tab="up"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 16V4m0 0-4 4m4-4 4 4M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>Tải file lên</button>
+      <button role="tab" aria-selected="false" data-tab="rec"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>Thu âm trực tiếp</button>
+      <button role="tab" aria-selected="false" data-tab="lib"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>File mẫu</button>
     </div>
     <div data-panel="up">
       <label class="drop" id="drop">
         <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 16V4m0 0-4 4m4-4 4 4M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
-        <span><strong>Kéo thả tệp</strong> hoặc bấm để chọn</span>
+        <span><strong>Kéo thả file vào đây</strong> hoặc bấm để chọn file</span>
         <span style="font-size:12px">mp3, m4a, ogg, wav</span>
         <input id="file" type="file" accept="audio/*,video/*" class="visually-hidden">
       </label>
@@ -150,7 +150,7 @@
     <div data-panel="rec" hidden>
       <div class="rec">
         <button class="recbtn" id="recBtn" aria-label="Bắt đầu ghi âm"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
-        <p class="hint" id="recHint">Bấm để ghi, nói ít nhất 4 giây.</p>
+        <p class="hint" id="recHint">Bấm để bắt đầu thu âm, nói tối thiểu 4 giây.</p>
       </div>
     </div>
     <div data-panel="lib" hidden>
@@ -165,11 +165,11 @@
 
   <!-- Bước 2 -->
   <section class="card" aria-labelledby="s2">
-    <h2 class="step" id="s2"><b>2</b>Nguồn cuộc gọi</h2>
+    <h2 class="step" id="s2"><b>2</b>Kênh truyền cuộc gọi</h2>
     <div class="sources" id="sources"></div>
   </section>
 
-  <button class="cta" id="go" disabled>Kiểm tra</button>
+  <button class="cta" id="go" disabled>Phân tích giọng nói</button>
 
   </div>
   <div class="colR"><div id="result"></div></div>
@@ -180,26 +180,26 @@
 <script>
 // Kênh hiển thị cho người dùng: tên quen thuộc, ánh xạ sang mô phỏng codec của máy chủ.
 const SOURCES = [
-  {ch:"none",   name:"Tệp ghi âm",          sub:"Thu trực tiếp, chưa qua cuộc gọi", icon:"M9 18V5l11-2v13M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm11-2a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"},
-  {ch:"opus12", name:"Zalo, Messenger",     sub:"Gọi qua Internet",                 icon:"M4 5h16v11H8l-4 4V5Z"},
-  {ch:"amrnb",  name:"Điện thoại di động",  sub:"Cuộc gọi 3G, 4G thường",           icon:"M8 2h8a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Zm3 17h2"},
-  {ch:"amrwb",  name:"Gọi VoLTE, HD",       sub:"Di động chất lượng cao",           icon:"M8 2h8a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Zm2 6h4m-4 3h4"},
-  {ch:"g711u",  name:"Tổng đài, máy bàn",   sub:"Điện thoại cố định",               icon:"M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z"},
-  {ch:"gsm",    name:"Di động 2G",          sub:"Sóng yếu, mạng cũ",                icon:"M2 20h2m3 0V16m4 4v-8m4 8V9m4 11V5"},
+  {ch:"none",   name:"File thu gốc",        sub:"Chất lượng cao, không nén thoại",   icon:"M9 18V5l11-2v13M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm11-2a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"},
+  {ch:"opus12", name:"Zalo, Messenger",     sub:"Cuộc gọi qua Internet (VoIP)",     icon:"M4 5h16v11H8l-4 4V5Z"},
+  {ch:"amrnb",  name:"Di động thông thường",sub:"Cuộc gọi mạng 3G, 4G tiêu chuẩn",  icon:"M8 2h8a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Zm3 17h2"},
+  {ch:"amrwb",  name:"VoLTE / HD Voice",    sub:"Thoại di động chất lượng cao",      icon:"M8 2h8a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Zm2 6h4m-4 3h4"},
+  {ch:"g711u",  name:"Máy bàn, tổng đài",   sub:"Mạng viễn thông cố định (PSTN)",   icon:"M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z"},
+  {ch:"gsm",    name:"Mạng 2G / Sóng yếu",  sub:"Băng hẹp, tỷ lệ nén cao",           icon:"M2 20h2m3 0V16m4 4v-8m4 8V9m4 11V5"},
 ];
 const VERDICT = {
-  LOW:    {title:"Giọng thật", text:"Không thấy dấu hiệu rõ ràng của giọng nhân bản.",
-           todo:["Tiếp tục bình thường.", "Với giao dịch lớn, vẫn nên xác minh qua một kênh khác."],
+  LOW:    {title:"Giọng người thật", text:"Không phát hiện dấu hiệu can thiệp hay giả mạo giọng nói.",
+           todo:["Cho phép tiếp tục giao dịch bình thường.", "Với giao dịch giá trị lớn, nên kết hợp xác thực qua kênh độc lập."],
            icon:'<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg>'},
-  MEDIUM: {title:"Chưa chắc chắn", text:"Một số đoạn có dấu hiệu bất thường, cần xác minh thêm.",
-           todo:["Gọi lại vào số điện thoại đã đăng ký của người này.", "Hỏi một thông tin chỉ người thật mới biết.", "Chưa chuyển tiền hay cung cấp mã OTP cho tới khi xác minh xong."],
+  MEDIUM: {title:"Nghi vấn cần kiểm tra", text:"Phát hiện một số đoạn âm thanh bất thường, cần xác minh thêm.",
+           todo:["Chủ động gọi lại số điện thoại chính chủ đã đăng ký của khách hàng.", "Đặt câu hỏi nghiệp vụ hoặc thông tin bảo mật riêng để xác thực.", "Tạm dừng xử lý giao dịch hoặc cấp mã OTP cho tới khi đối soát xong."],
            icon:'<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4m0 3h.01"/></svg>'},
-  HIGH:   {title:"Giọng giả", text:"Giọng nói có đặc điểm của giọng do AI tạo ra.",
-           todo:["Không chuyển tiền, không cung cấp mã OTP hay mật khẩu.", "Dừng giao dịch và báo bộ phận chống gian lận.", "Liên hệ người này qua kênh khác để xác nhận."],
+  HIGH:   {title:"Cảnh báo giả mạo (Deepfake)", text:"Giọng nói mang đặc trưng giả lập nhân tạo được tạo bởi AI.",
+           todo:["Tuyệt đối không chuyển tiền, không cung cấp mã OTP hay mật khẩu.", "Chặn ngay giao dịch và chuyển cảnh báo tới bộ phận phòng chống gian lận.", "Liên hệ người yêu cầu qua kênh độc lập đã xác thực để kiểm chứng."],
            icon:'<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2h8l6 6v8l-6 6H8l-6-6V8l6-6Z"/><path d="m9 9 6 6m0-6-6 6"/></svg>'},
 };
-const LEVEL_WORD = {LOW:"Thật", MEDIUM:"Chưa chắc chắn", HIGH:"Giả"};
-const CH_NAME = {none:"Tệp ghi âm", nb8k:"Băng hẹp 8 kHz", g711u:"Tổng đài (G.711)", g711a:"G.711 A-law", gsm:"Di động 2G (GSM)",
+const LEVEL_WORD = {LOW:"Giọng thật", MEDIUM:"Nghi vấn", HIGH:"Giả mạo"};
+const CH_NAME = {none:"File thu gốc", nb8k:"Băng hẹp 8 kHz", g711u:"Tổng đài cố định (G.711)", g711a:"G.711 A-law", gsm:"Di động 2G (GSM)",
   amrnb:"Di động 3G, 4G (AMR-NB)", amrwb:"VoLTE (AMR-WB)", g722:"Tổng đài IP (G.722)", opus12:"Zalo, Messenger (Opus)", mp3_32:"Tin nhắn thoại (MP3)"};
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -233,23 +233,23 @@ document.querySelectorAll(".seg button").forEach(b => b.onclick = () => {
 // ---------- mẫu thử ----------
 fetch("/v1/samples").then(r => r.json()).then(list => { samples = list; renderSamples(); });
 function renderSamples() {
-  $("labFilter").innerHTML = [["all","Tất cả"],["bonafide","Giọng thật"],["spoof","Giọng giả"]]
+  $("labFilter").innerHTML = [["all","Tất cả"],["bonafide","Giọng thật"],["spoof","Giả mạo AI"]]
     .map(([k,t]) => `<button data-lab="${k}" aria-pressed="${k === labSel}">${t}</button>`).join("");
   $("labFilter").onclick = e => { if (e.target.dataset.lab) { labSel = e.target.dataset.lab; renderSamples(); } };
   if (!samples.length) {
-    $("samples").innerHTML = `<p class="empty">Chưa có mẫu thử.</p>`;
+    $("samples").innerHTML = `<p class="empty">Chưa có file mẫu trong hệ thống.</p>`;
     return;
   }
   const rows = samples.filter(s => labSel === "all" || s.label === labSel);
   $("samples").innerHTML = rows.map(s => `
     <button class="sample" data-id="${s.id}" aria-pressed="${current?.sample?.id === s.id}">
       <span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"/></svg></span>
-      <span><b>${s.label === "spoof" ? "Giọng giả" : "Giọng thật"}</b><small>${esc(s.dataset_title)}${s.detail ? " · " + esc(s.detail) : ""} · ${s.duration_s.toFixed(0)} s</small></span>
-    </button>`).join("") || `<p class="empty">Không có mẫu nào.</p>`;
+      <span><b>${s.label === "spoof" ? "Giả mạo AI" : "Giọng thật"}</b><small>${esc(s.dataset_title)}${s.detail ? " · " + esc(s.detail) : ""} · ${s.duration_s.toFixed(0)} s</small></span>
+    </button>`).join("") || `<p class="empty">Không tìm thấy file mẫu phù hợp.</p>`;
   document.querySelectorAll(".sample").forEach(el => el.onclick = async () => {
     const s = samples.find(x => x.id === el.dataset.id);
     const blob = await (await fetch(`/samples/${encodeURIComponent(s.file)}`)).blob();
-    await setClip({blob, name:s.file, sample:s}, `Mẫu thử: ${s.label === "spoof" ? "giọng giả" : "giọng thật"} · ${s.dataset_title}`);
+    await setClip({blob, name:s.file, sample:s}, `Mẫu đối chứng: ${s.label === "spoof" ? "Giả mạo AI" : "Giọng thật"} · ${s.dataset_title}`);
     renderSamples();
   });
 }
@@ -267,19 +267,19 @@ $("recBtn").onclick = async () => {
   if (rec) { rec.stop(); return; }
   let stream;
   try { stream = await navigator.mediaDevices.getUserMedia({audio:true}); }
-  catch { $("recHint").textContent = "Trình duyệt chưa cho phép dùng micro."; return; }
+  catch { $("recHint").textContent = "Trình duyệt chưa được cấp quyền sử dụng microphone."; return; }
   chunks = []; rec = new MediaRecorder(stream);
   rec.ondataavailable = e => chunks.push(e.data);
   rec.onstop = async () => {
     stream.getTracks().forEach(t => t.stop()); clearInterval(tick);
-    $("recBtn").classList.remove("on"); $("recBtn").setAttribute("aria-label", "Ghi lại");
+    $("recBtn").classList.remove("on"); $("recBtn").setAttribute("aria-label", "Thu âm lại");
     const blob = new Blob(chunks, {type:rec.mimeType}); rec = null;
     const ext = blob.type.includes("ogg") ? "ogg" : blob.type.includes("mp4") ? "m4a" : "webm";
-    $("recHint").textContent = "Đã ghi xong. Bấm lần nữa để ghi lại.";
-    await setClip({blob, name:`ghi-am.${ext}`}, "Bản ghi âm vừa thu");
+    $("recHint").textContent = "Đã thu âm xong. Bấm để thu âm lại nếu cần.";
+    await setClip({blob, name:`ghi-am.${ext}`}, "Bản thu âm trực tiếp");
   };
-  rec.start(); t0 = Date.now(); $("recBtn").classList.add("on"); $("recBtn").setAttribute("aria-label", "Dừng ghi âm");
-  tick = setInterval(() => $("recHint").textContent = `Đang ghi ${((Date.now() - t0) / 1000).toFixed(0)} s... bấm để dừng`, 250);
+  rec.start(); t0 = Date.now(); $("recBtn").classList.add("on"); $("recBtn").setAttribute("aria-label", "Dừng thu âm");
+  tick = setInterval(() => $("recHint").textContent = `Đang thu âm ${((Date.now() - t0) / 1000).toFixed(0)}s... Bấm để hoàn tất`, 250);
 };
 
 // ---------- trình phát và dạng sóng ----------
@@ -340,8 +340,8 @@ const lvl = (v, p) => v < p.t_high ? "HIGH" : v < p.t_medium ? "MEDIUM" : "LOW";
 function render(d) {
   last = d;
   const v = VERDICT[d.risk_level], p = d.policy, fake = d.spoof_percent;
-  const pctText = d.risk_level === "LOW" ? `${Math.round(100 - fake)}%<small>khả năng thật</small>`
-                                         : `${Math.round(fake)}%<small>khả năng giả</small>`;
+  const pctText = d.risk_level === "LOW" ? `${Math.round(100 - fake)}%<small>độ tin cậy thật</small>`
+                                         : `${Math.round(fake)}%<small>nguy cơ giả mạo</small>`;
   // Mức của từng đoạn thời gian: đoạn bị nhiều cửa sổ phủ lấy mức xấu nhất.
   const dur = d.duration_s, bins = 160, rank = {LOW:0, MEDIUM:1, HIGH:2};
   levels = Array.from({length:bins}, (_, i) => {
@@ -356,37 +356,37 @@ function render(d) {
   let truth = "";
   if (s) {
     const ok = (s.label === "spoof") === (d.risk_level !== "LOW");
-    truth = `<div class="truth">Đáp án của mẫu thử: <b>${s.label === "spoof" ? "giọng giả" : "giọng thật"}</b>${s.detail ? " (" + esc(s.detail) + ")" : ""}.
-      Hệ thống ${ok ? '<b class="ok">đoán đúng</b>' : '<b class="bad">đoán sai</b>'}.</div>`;
+    truth = `<div class="truth">Nhãn đối chứng của mẫu: <b>${s.label === "spoof" ? "Giả mạo AI" : "Giọng thật"}</b>${s.detail ? " (" + esc(s.detail) + ")" : ""}.
+      Kết quả phân tích: ${ok ? '<b class="ok">nhận diện chính xác</b>' : '<b class="bad">nhận diện sai lệch</b>'}.</div>`;
   }
   $("result").innerHTML = `
     <section class="card" aria-live="polite">
       <div class="verdict has-pct ${d.risk_level}">${v.icon}<h2>${v.title}</h2><div class="pct">${pctText}</div></div>
       <div class="gauge" aria-hidden="true">
         <div class="bar"><div class="dot" style="left:${Math.min(97, Math.max(3, 100 - fake)).toFixed(1)}%"></div></div>
-        <div class="labels"><span>Giả 100%</span><span>50%</span><span>Thật 100%</span></div>
+        <div class="labels"><span>100% Giả mạo</span><span>50%</span><span>100% Giọng thật</span></div>
       </div>
-      <h3>Xử lý</h3>
+      <h3>Khuyến nghị xử lý</h3>
       <ul class="todo">${v.todo.map(t => `<li>${t}</li>`).join("")}</ul>
-      ${d.segments.length > 1 ? `<h3>Đoạn bất thường</h3>
-        <p style="margin:0">${sus ? `${sus}/${d.segments.length} đoạn bất thường` : "Không có đoạn bất thường"}
-          ${worst && lvl(worst.score, p) !== "LOW" ? `<button class="linkbtn" id="playWorst">Nghe đoạn đáng ngờ nhất (${worst.start.toFixed(0)}–${worst.end.toFixed(0)} s)</button>` : ""}</p>
-        <div class="legend"><span><i style="background:var(--ok)"></i>Bình thường</span><span><i style="background:var(--warn)"></i>Chưa chắc chắn</span><span><i style="background:var(--bad)"></i>Giống giọng giả</span></div>` : ""}
+      ${d.segments.length > 1 ? `<h3>Phân đoạn âm thanh nghi vấn</h3>
+        <p style="margin:0">${sus ? `${sus}/${d.segments.length} đoạn có dấu hiệu bất thường` : "Không phát hiện đoạn bất thường"}
+          ${worst && lvl(worst.score, p) !== "LOW" ? `<button class="linkbtn" id="playWorst">Nghe đoạn nghi vấn nhất (${worst.start.toFixed(0)}–${worst.end.toFixed(0)} s)</button>` : ""}</p>
+        <div class="legend"><span><i style="background:var(--ok)"></i>Bình thường</span><span><i style="background:var(--warn)"></i>Nghi vấn</span><span><i style="background:var(--bad)"></i>Dấu hiệu giả mạo</span></div>` : ""}
       ${truth}
-      <details class="tech"><summary>Chi tiết kỹ thuật</summary>
+      <details class="tech"><summary>Thông số phân tích kỹ thuật</summary>
         <dl class="kv">
-          <dt>Kênh mô phỏng</dt><dd>${esc(CH_NAME[d.channel_simulated] || d.channel_simulated)}</dd>
-          <dt>Phần trăm</dt><dd>${d.spoof_percent_method === "platt" ? "xác suất hiệu chỉnh trên In-the-Wild cho kênh này, giả định khả năng thật và giả ban đầu ngang nhau" : "ước lượng theo hai ngưỡng (ngưỡng trung bình ứng với 50%, ngưỡng cao với 90%), chưa hiệu chỉnh xác suất"}</dd>
-          <dt>Điểm tổng hợp</dt><dd>${d.score.toFixed(2)} (cao hơn là giống thật hơn)</dd>
-          <dt>Ngưỡng</dt><dd>cần xác minh dưới ${p.t_medium.toFixed(2)}, giả dưới ${p.t_high.toFixed(2)}</dd>
-          <dt>Thời lượng</dt><dd>${d.duration_s} s, ${d.n_segments} cửa sổ 4 s</dd>
+          <dt>Kênh giả lập</dt><dd>${esc(CH_NAME[d.channel_simulated] || d.channel_simulated)}</dd>
+          <dt>Phương pháp ước tính xác suất</dt><dd>${d.spoof_percent_method === "platt" ? "hiệu chuẩn xác suất (Platt scaling) theo tập In-the-Wild trên kênh này, phân bổ prior 50:50" : "nội suy theo 2 mốc ngưỡng (ngưỡng trung bình 50%, ngưỡng cao 90%), chưa qua hiệu chuẩn Platt"}</dd>
+          <dt>Điểm tin cậy (Score)</dt><dd>${d.score.toFixed(2)} (điểm càng cao, tỷ lệ giọng thật càng lớn)</dd>
+          <dt>Mốc ngưỡng</dt><dd>nghi vấn &lt; ${p.t_medium.toFixed(2)}, giả mạo &lt; ${p.t_high.toFixed(2)}</dd>
+          <dt>Thời lượng</dt><dd>${d.duration_s}s (${d.n_segments} khung phân tích 4s)</dd>
           <dt>Thời gian xử lý</dt><dd>${d.timing_ms.model} ms</dd>
-          <dt>Mô hình</dt><dd>${health?.model?.random_weights ? "trọng số ngẫu nhiên (chế độ thử)" : `encoder ${health?.model?.num_layers ?? "?"} lớp`}, ${esc(p.source)}</dd>
+          <dt>Mô hình</dt><dd>${health?.model?.random_weights ? "trọng số ngẫu nhiên (chế độ demo)" : `Mạng Encoder ${health?.model?.num_layers ?? "?"} lớp`}, ${esc(p.source)}</dd>
         </dl>
-        <table><thead><tr><th>Đoạn</th><th>Điểm</th><th>Đánh giá</th></tr></thead><tbody>
+        <table><thead><tr><th>Khung thời gian</th><th>Điểm số</th><th>Đánh giá</th></tr></thead><tbody>
           ${d.segments.map(x => `<tr><td>${x.start.toFixed(1)}–${x.end.toFixed(1)} s</td><td>${x.score.toFixed(2)}</td><td><span class="pill ${lvl(x.score, p)}">${LEVEL_WORD[lvl(x.score, p)]}</span></td></tr>`).join("")}
         </tbody></table>
-        <p style="margin-top:12px"><button class="linkbtn" id="cmp">So sánh kết quả qua các kênh gọi</button></p>
+        <p style="margin-top:12px"><button class="linkbtn" id="cmp">So sánh kết quả trên các kênh gọi khác nhau</button></p>
         <div id="cmpOut"></div>
       </details>
     </section>`;
@@ -395,21 +395,21 @@ function render(d) {
 }
 
 $("go").onclick = async () => {
-  const b = $("go"); b.disabled = true; b.innerHTML = `<span class="spin"></span>Đang kiểm tra`;
+  const b = $("go"); b.disabled = true; b.innerHTML = `<span class="spin"></span>Đang phân tích...`;
   try { render(await analyze(channel)); if (innerWidth < 980 || !document.body.classList.contains("embed")) $("result").scrollIntoView({behavior:"smooth", block:"start"}); }
   catch (e) { $("result").innerHTML = `<section class="card"><p class="err">${esc(e.message)}</p></section>`; }
-  b.disabled = false; b.textContent = "Kiểm tra";
+  b.disabled = false; b.textContent = "Phân tích giọng nói";
 };
 
 async function compare() {
   const out = $("cmpOut"), rows = [];
   const chans = SOURCES.map(s => s.ch).filter(c => health?.channel_info?.[c]?.available !== false);
   for (const [i, c] of chans.entries()) {
-    out.innerHTML = `<p class="hint" style="text-align:left">Đang kiểm tra kênh ${i + 1}/${chans.length}...</p>`;
+    out.innerHTML = `<p class="hint" style="text-align:left">Đang phân tích kênh ${i + 1}/${chans.length}...</p>`;
     try { rows.push([c, await analyze(c)]); } catch (e) { rows.push([c, {error:e.message}]); }
   }
-  out.innerHTML = `<table><thead><tr><th>Nếu đoạn này đi qua</th><th>Kết luận</th></tr></thead><tbody>
-    ${rows.map(([c, d]) => `<tr><td>${SOURCES.find(s => s.ch === c).name}</td><td>${d.error ? esc(d.error) : `<span class="pill ${d.risk_level}">${LEVEL_WORD[d.risk_level]}</span> ${Math.round(d.spoof_percent)}% giả`}</td></tr>`).join("")}
+  out.innerHTML = `<table><thead><tr><th>Kênh truyền âm thanh</th><th>Kết quả đánh giá</th></tr></thead><tbody>
+    ${rows.map(([c, d]) => `<tr><td>${SOURCES.find(s => s.ch === c).name}</td><td>${d.error ? esc(d.error) : `<span class="pill ${d.risk_level}">${LEVEL_WORD[d.risk_level]}</span> ${Math.round(d.spoof_percent)}% giả mạo`}</td></tr>`).join("")}
   </tbody></table>`;
 }
 </script>

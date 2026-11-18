@@ -10,9 +10,9 @@ import math
 from dataclasses import asdict, dataclass, field
 
 LEVELS = {
-    "LOW": "Tiếp tục quy trình bình thường",
-    "MEDIUM": "Xác thực bổ sung: gọi lại số đã đăng ký hoặc dùng kênh xác thực thứ hai",
-    "HIGH": "Tạm dừng giao dịch, chuyển bộ phận chống gian lận xem xét",
+    "LOW": "Cho phép tiếp tục giao dịch bình thường",
+    "MEDIUM": "Xác thực bổ sung: chủ động gọi lại số chính chủ hoặc xác thực qua kênh thứ hai",
+    "HIGH": "Tạm dừng giao dịch, chuyển bộ phận phòng chống gian lận xử lý",
 }
 
 
@@ -21,7 +21,7 @@ class Policy:
     t_high: float  # score < t_high -> HIGH (FRR 1%: few genuine callers are stopped)
     t_medium: float  # t_high <= score < t_medium -> MEDIUM (FRR 7%: extra verification budget)
     calibrated: bool = False
-    source: str = "mặc định, chưa hiệu chỉnh"
+    source: str = "mặc định, chưa qua hiệu chuẩn"
     # Platt scaling P(spoof | score) = 1 / (1 + exp(a * score + b)), fitted per channel with equal priors
     # (python -m voiceguard.calibrate). Empty: the percentage is estimated from the two thresholds.
     platt: dict = field(default_factory=dict)

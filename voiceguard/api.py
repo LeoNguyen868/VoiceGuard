@@ -278,7 +278,7 @@ async def analyze(file: UploadFile = File(...), mode: str = Form("window"),
         try:
             wav = load_audio(tmp.name)
         except Exception as e:
-            raise HTTPException(415, f"không giải mã được tệp âm thanh: {e}")
+            raise HTTPException(415, f"Không thể giải mã file âm thanh: {e}")
         finally:
             os.unlink(tmp.name)
         wav = apply_channel(wav, channel)
@@ -384,7 +384,7 @@ async def call_audio(call_id: str, request: Request):
     det = _get()
     call = _state["calls"].get(call_id)
     if call is None:
-        raise HTTPException(404, "không tìm thấy cuộc gọi")
+        raise HTTPException(404, "Không tìm thấy thông tin cuộc gọi")
     data = await request.body()
     if len(data) % 2:
         raise HTTPException(422, "PCM 16-bit phải có số byte chẵn")
@@ -487,7 +487,7 @@ def call_recording(call_id: str):
     """The call's audio (16 kHz mono WAV), kept for flagged calls only (VG_RECORD)."""
     f = _rec_dir() / f"{call_id}.wav"
     if not f.exists():
-        raise HTTPException(404, "cuộc gọi này không có bản ghi")
+        raise HTTPException(404, "Cuộc gọi này không có file ghi âm")
     return FileResponse(f, media_type="audio/wav")
 
 
@@ -495,13 +495,13 @@ def call_recording(call_id: str):
 def get_call(call_id: str):
     c = _store().get_call(call_id)
     if c is None:
-        raise HTTPException(404, "không tìm thấy cuộc gọi")
+        raise HTTPException(404, "Không tìm thấy thông tin cuộc gọi")
     c["policy"] = _policy_for(c["channel"] or "none").to_dict()
     return c
 
 
-ACTIONS = {"continue": "Tiếp tục sau khi xác minh", "verify": "Đang xác minh bổ sung",
-           "hold": "Tạm giữ giao dịch", "transfer": "Chuyển bộ phận chống gian lận"}
+ACTIONS = {"continue": "Đã xác minh · Tiếp tục giao dịch", "verify": "Yêu cầu xác thực bổ sung",
+           "hold": "Tạm dừng giao dịch", "transfer": "Chuyển phòng chống gian lận"}
 
 
 @app.post("/v1/calls/{call_id}/action")
@@ -510,7 +510,7 @@ def call_action(call_id: str, action: str = Form(...), agent: str = Form("")):
     if action not in ACTIONS:
         raise HTTPException(422, f"action phải thuộc {list(ACTIONS)}")
     if _store().get_call(call_id) is None:
-        raise HTTPException(404, "không tìm thấy cuộc gọi")
+        raise HTTPException(404, "Không tìm thấy thông tin cuộc gọi")
     _store().update_call(call_id, action=action, action_at=time.time(), **({"agent": agent} if agent else {}))
     ev = dict(type="action", call=_store().get_call(call_id))
     BUS.publish(ev)
@@ -525,11 +525,11 @@ def call_verdict(call_id: str, verdict: str = Form(...), note: str = Form(""), a
     if verdict not in ("fraud", "genuine"):
         raise HTTPException(422, "verdict phải là 'fraud' hoặc 'genuine'")
     if _store().get_call(call_id) is None:
-        raise HTTPException(404, "không tìm thấy cuộc gọi")
+        raise HTTPException(404, "Không tìm thấy thông tin cuộc gọi")
     _store().update_call(call_id, verdict=verdict, verdict_note=note, verdict_by=analyst, verdict_at=time.time())
     key, masked = _store().caller_key_of(call_id)
     if verdict == "fraud" and key:
-        _store().add_number(key=key, masked=masked, lst="blacklist", source=f"xác nhận gian lận, cuộc gọi {call_id[:8]}",
+        _store().add_number(key=key, masked=masked, lst="blacklist", source=f"Xác nhận gian lận từ cuộc gọi {call_id[:8]}",
                             note=note)
         BUS.publish(dict(type="numbers"))
     ev = dict(type="verdict", call=_store().get_call(call_id))
@@ -554,9 +554,9 @@ def add_number(number: str = Form(""), list: str = Form("blacklist"), note: str 
     try:
         if key:
             masked = next((s["masked"] for s in _store().suggestions(min_high=1) if s["key"] == key), "số đã che")
-            _store().add_number(key=key, masked=masked, lst=list, source="duyệt đề xuất", note=note)
+            _store().add_number(key=key, masked=masked, lst=list, source="Duyệt từ danh sách đề xuất", note=note)
         else:
-            _store().add_number(number, list, source="nhập tay", note=note)
+            _store().add_number(number, list, source="Thêm thủ công", note=note)
     except ValueError as e:
         raise HTTPException(422, str(e))
     BUS.publish(dict(type="numbers"))
@@ -566,7 +566,7 @@ def add_number(number: str = Form(""), list: str = Form("blacklist"), note: str 
 @app.delete("/v1/numbers/{key}")
 def remove_number(key: str, list: str = "blacklist"):
     if not _store().remove_number(key, list):
-        raise HTTPException(404, "không có số này trong danh sách")
+        raise HTTPException(404, "Số điện thoại không có trong danh sách")
     BUS.publish(dict(type="numbers"))
     return dict(ok=True)
 

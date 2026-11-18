@@ -1,8 +1,8 @@
 """Call history, number lists and operator feedback, in SQLite (standard library, one file).
 
 Phone numbers are never stored in clear: a number is kept as a salted SHA-256 key (to match the
-blacklist and count repeat callers) and a masked form for display ("0912***678"). Audio is not stored;
-a call may carry the reference of the recording kept by the PBX.
+blacklist and count repeat callers) and a masked form for display ("0912***678"). Audio of flagged calls
+is kept for review as a WAV file (see api.py, VG_RECORD); the table only holds whether it exists.
 """
 import hashlib
 import os
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS calls (
   id TEXT PRIMARY KEY, started_at REAL, ended_at REAL, status TEXT,
   caller_key TEXT, caller_masked TEXT, category TEXT, channel TEXT, agent TEXT, recording_ref TEXT,
   duration_s REAL, n_windows INTEGER DEFAULT 0, score REAL, spoof_percent REAL,
-  risk_level TEXT, max_level TEXT, screened_by TEXT,
+  risk_level TEXT, max_level TEXT, screened_by TEXT, recording INTEGER DEFAULT 0,
   action TEXT, action_at REAL, verdict TEXT, verdict_note TEXT, verdict_by TEXT, verdict_at REAL);
 CREATE INDEX IF NOT EXISTS calls_started ON calls(started_at);
 CREATE INDEX IF NOT EXISTS calls_caller ON calls(caller_key);
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS numbers (
 
 CALL_FIELDS = ("id", "started_at", "ended_at", "status", "caller_masked", "category", "channel", "agent",
                "recording_ref", "duration_s", "n_windows", "score", "spoof_percent", "risk_level", "max_level",
-               "screened_by", "action", "action_at", "verdict", "verdict_note", "verdict_by", "verdict_at")
+               "screened_by", "recording", "action", "action_at", "verdict", "verdict_note", "verdict_by", "verdict_at")
 
 
 def mask(number):
@@ -51,6 +51,9 @@ class Store:
         self.lock = threading.Lock()
         with self.lock:
             self.db.executescript(SCHEMA)
+            cols = {r["name"] for r in self.db.execute("PRAGMA table_info(calls)")}
+            if "recording" not in cols:                                   # database from an older version
+                self.db.execute("ALTER TABLE calls ADD COLUMN recording INTEGER DEFAULT 0")
             row = self.db.execute("SELECT v FROM meta WHERE k='salt'").fetchone()
             if row is None:
                 self.salt = os.environ.get("VG_SALT") or secrets.token_hex(16)

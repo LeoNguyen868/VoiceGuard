@@ -16,7 +16,10 @@ Environment variables:
   VG_BLACKLIST   text file of blacklisted numbers, one per line, imported at start-up
   VG_DB          SQLite file of call history, number lists and feedback (default data/voiceguard.db)
   VG_WEBHOOK_URL URL that receives a JSON POST when a call reaches HIGH or an agent holds or transfers it
-  VG_AUDIT_LOG   JSONL audit log path (default: logs/audit.jsonl). Audio and phone numbers are never stored.
+  VG_RECORD      flagged (default): keep the audio of calls that reached MEDIUM or HIGH, for review;
+                 all: keep every call; none: keep no audio
+  VG_RECORD_DAYS recordings older than this are deleted at start-up (default 30)
+  VG_AUDIT_LOG   JSONL audit log path (default: logs/audit.jsonl); it holds no audio and no phone number.
   VG_CUDA_GRAPH=1    replay CUDA Graphs for 4 s windows (GPU only)
   VG_BATCH=0         run each request alone instead of batching windows across requests and calls
   VG_BATCH_MAX       largest batch of windows (default 16)
@@ -39,6 +42,7 @@ import threading
 import time
 import urllib.request
 import uuid
+import wave
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -129,6 +133,37 @@ def _store():
     return _state["store"]
 
 
+def _rec_dir():
+    d = Path(os.environ.get("VG_RECORD_DIR", str(ROOT / "data" / "recordings")))
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _purge_recordings():
+    days = float(os.environ.get("VG_RECORD_DAYS", 30))
+    for f in _rec_dir().glob("*"):
+        if f.stat().st_mtime < time.time() - days * 86400:
+            f.unlink(missing_ok=True)
+
+
+def _finish_recording(call):
+    """Keep the call's audio as WAV when the policy says so, else delete it."""
+    if call.rec is None:
+        return False
+    call.rec.close()
+    raw = _rec_dir() / f"{call.id}.pcm"
+    mode = os.environ.get("VG_RECORD", "flagged")
+    keep = mode == "all" or (mode == "flagged" and LEVEL_RANK[call.max_level] >= LEVEL_RANK["MEDIUM"])
+    if keep and raw.stat().st_size:
+        with wave.open(str(_rec_dir() / f"{call.id}.wav"), "wb") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(SR)
+            w.writeframes(raw.read_bytes())
+    raw.unlink(missing_ok=True)
+    return keep
+
+
 def _classify(number):
     """Caller category from the stored lists (blacklist wins)."""
     if number is None or number.strip() == "":
@@ -173,6 +208,7 @@ def _webhook(event):
 def _startup():
     _get()
     _store()
+    _purge_recordings()
 
 
 @app.get("/")
@@ -282,6 +318,7 @@ class _Call:
         self.scores, self.skipped, self.sha = [], 0, hashlib.sha256()
         self.received, self.started = 0, time.time()
         self.max_level, self.alerted = None, False
+        self.rec = None if os.environ.get("VG_RECORD", "flagged") == "none" else open(_rec_dir() / f"{call_id}.pcm", "wb")
 
 
 def _decision(call):
@@ -353,6 +390,8 @@ async def call_audio(call_id: str, request: Request):
         raise HTTPException(422, "PCM 16-bit phải có số byte chẵn")
     call.sha.update(data)
     call.received += len(data) // 2
+    if call.rec is not None:
+        call.rec.write(data)
     new = []
     if call.category != "blacklist":  # blacklisted calls are never scored, so no audio is kept
         call.buf = np.concatenate([call.buf, np.frombuffer(data, dtype="<i2").astype(np.float32) / 32768.0])
@@ -400,7 +439,8 @@ async def end_call(call_id: str):
     dec = _decision(call)
     if dec["risk_level"]:
         _after_decision(call, dec)
-    _store().update_call(call.id, status="ended", ended_at=time.time(), duration_s=round(call.received / SR, 2))
+    _store().update_call(call.id, status="ended", ended_at=time.time(), duration_s=round(call.received / SR, 2),
+                         recording=int(_finish_recording(call)))
     result = dict(request_id=call_id, duration_s=round(call.received / SR, 2), mode="stream",
                   n_segments=len(call.scores), skipped_silent=call.skipped, caller_category=call.category,
                   channel_simulated=call.channel, timing_ms=dict(wall_s=round(time.time() - call.started, 2)), **dec)
@@ -440,6 +480,15 @@ def list_calls(status: str = None, min_level: str = None, unreviewed: bool = Fal
         raise HTTPException(422, "min_level phải là LOW, MEDIUM hoặc HIGH")
     since = time.time() - hours * 3600 if hours else None
     return _store().list_calls(status, min_level, unreviewed, limit, since)
+
+
+@app.get("/v1/calls/{call_id}/recording")
+def call_recording(call_id: str):
+    """The call's audio (16 kHz mono WAV), kept for flagged calls only (VG_RECORD)."""
+    f = _rec_dir() / f"{call_id}.wav"
+    if not f.exists():
+        raise HTTPException(404, "cuộc gọi này không có bản ghi")
+    return FileResponse(f, media_type="audio/wav")
 
 
 @app.get("/v1/calls/{call_id}")

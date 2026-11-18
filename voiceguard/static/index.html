@@ -111,14 +111,19 @@
   .pill.LOW { background:var(--ok-bg); color:var(--ok); } .pill.MEDIUM { background:var(--warn-bg); color:var(--warn); } .pill.HIGH { background:var(--bad-bg); color:var(--bad); }
   .note { font-size:13px; color:var(--muted); margin-top:14px; }
   .err { color:var(--bad); font-weight:600; }
+  body.embed { background:var(--bg); }
+  body.embed header, body.embed .tagline { display:none; }
+  body.embed .wrap { max-width:820px; margin:0; padding:0 0 32px; }
   .visually-hidden { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
 </style>
 </head>
 <body>
+<script>if (new URLSearchParams(location.search).has("embed")) document.body.classList.add("embed");</script>
 <div class="wrap">
   <header>
     <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z" fill="var(--accent)"/><path d="M8 12h1m2-3v6m2-4v2m2-3v4" stroke="var(--accent-fg)" stroke-width="1.8" stroke-linecap="round"/></svg>
     <h1>VoiceGuard</h1>
+    <a href="/" style="margin-left:auto;color:var(--accent);text-decoration:none;font-weight:600;font-size:14px">← Bảng điều khiển tổng đài</a>
   </header>
   <p class="tagline">Kiểm tra một đoạn giọng nói là của người thật hay do AI nhân bản.</p>
   <div id="banner"></div>

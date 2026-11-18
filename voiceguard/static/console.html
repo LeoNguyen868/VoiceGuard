@@ -61,7 +61,9 @@
   /* tables */
   table { border-collapse:collapse; width:100%; }
   th, td { text-align:left; padding:9px 12px; border-bottom:1px solid var(--line); font-size:14px; vertical-align:middle; }
-  th { color:var(--muted); font-weight:600; font-size:13px; background:var(--soft); position:sticky; top:0; }
+  th { color:var(--muted); font-weight:600; font-size:13px; background:var(--soft); white-space:nowrap; }
+  .tablewrap { overflow-x:auto; }
+  td.num { white-space:nowrap; }
   tr.click { cursor:pointer; } tr.click:hover td { background:var(--soft); }
   td.num { font-variant-numeric:tabular-nums; }
   .tabs { display:flex; gap:4px; background:var(--soft); padding:4px; border-radius:10px; }
@@ -94,6 +96,13 @@
   .verdict b { font-size:22px; display:block; }
   .verdict .p { margin-left:auto; font-size:34px; font-weight:800; line-height:1; }
   .verdict p { margin:0; color:var(--fg); font-size:14px; }
+  .segs { position:relative; height:30px; background:var(--soft); border-radius:6px; margin:8px 0 4px; }
+  .segs button { position:absolute; top:4px; bottom:4px; border:0; border-radius:3px; cursor:pointer; padding:0; }
+  .segs button.HIGH { background:var(--bad); } .segs button.MEDIUM { background:var(--warn); } .segs button.LOW { background:var(--ok); opacity:.55; }
+  .segs button:hover { outline:2px solid var(--fg); }
+  .segs .ph { position:absolute; top:0; bottom:0; width:2px; background:var(--fg); pointer-events:none; }
+  .ticks { display:flex; justify-content:space-between; font-size:12px; color:var(--muted); }
+  .suspects { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
   .acts { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:12px 0; }
   .kv { display:grid; grid-template-columns:auto 1fr; gap:4px 14px; font-size:14px; }
   .kv dt { color:var(--muted); } .kv dd { margin:0; }
@@ -113,7 +122,7 @@
   <a href="#review" data-v="review"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>Hàng đợi điều tra<small>Chống gian lận</small></span><span class="badge" id="reviewBadge" hidden></span></a>
   <a href="#numbers" data-v="numbers"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span>Danh sách số<small>Chống gian lận</small></span></a>
   <a href="#overview" data-v="overview"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10m6 10V4m6 16v-7m6 7H2"/></svg><span>Tổng quan<small>Giám sát</small></span></a>
-  <a href="/check"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg><span>Kiểm tra tệp<small>Tin nhắn thoại, bản ghi</small></span></a>
+  <a href="#check" data-v="check"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg><span>Kiểm tra tệp<small>Tin nhắn thoại, bản ghi</small></span></a>
   <div class="foot"><span class="dot off" id="conn"></span><span id="connText">Đang kết nối...</span><div id="modelInfo"></div></div>
 </nav>
 <main id="view"></main>
@@ -138,7 +147,8 @@ let active = new Map(), recent = [], view = "live", health = null, audioCtx = nu
 
 // ---------- helpers ----------
 const ago = t => { const s = Math.max(0, Date.now() / 1000 - t); return s < 60 ? `${s | 0} giây` : s < 3600 ? `${s / 60 | 0} phút` : `${s / 3600 | 0} giờ`; };
-const clock = t => t ? new Date(t * 1000).toLocaleString("vi-VN", {hour:"2-digit", minute:"2-digit", day:"2-digit", month:"2-digit"}) : "–";
+const clock = t => { if (!t) return "–"; const d = new Date(t * 1000), p = n => String(n).padStart(2, "0");
+  return `${p(d.getHours())}:${p(d.getMinutes())} ${p(d.getDate())}/${p(d.getMonth() + 1)}`; };
 const dur = s => s == null ? "–" : `${(s / 60) | 0}:${String(Math.round(s % 60)).padStart(2, "0")}`;
 const lvlTag = l => l ? `<span class="lvl ${l}">${LEVEL[l].i} ${LEVEL[l].w}</span>` : `<span class="lvl">Đang nghe...</span>`;
 const pct = c => c.spoof_percent == null ? "" : `${Math.round(c.spoof_percent)}%<small>khả năng giả</small>`;
@@ -221,7 +231,18 @@ function setView() {
   render();
 }
 window.addEventListener("hashchange", setView);
-function render() { ({live:renderLive, review:renderReview, numbers:renderNumbers, overview:renderOverview}[view] || renderLive)(); }
+function render() { ({live:renderLive, review:renderReview, numbers:renderNumbers, overview:renderOverview, check:renderCheck}[view] || renderLive)(); }
+
+function renderCheck() {
+  if ($("checkFrame")) return;                                              // keep the tool's state across events
+  $("view").innerHTML = `
+    <div class="head"><div class="grow"><h1>Kiểm tra tệp</h1>
+      <p class="sub">Kiểm tra một tin nhắn thoại hoặc bản ghi khách hàng gửi tới: tải tệp, ghi âm, hoặc chọn mẫu thử.</p></div></div>
+    <iframe id="checkFrame" src="/check?embed=1" title="Kiểm tra tệp" style="width:100%;border:0;display:block;height:1200px"></iframe>`;
+  const f = $("checkFrame");
+  const fit = () => { try { f.style.height = f.contentDocument.documentElement.scrollHeight + "px"; } catch {} };
+  f.onload = () => { fit(); new ResizeObserver(fit).observe(f.contentDocument.body); };
+}
 
 function renderLive() {
   const order = {HIGH:0, MEDIUM:1, LOW:2};
@@ -246,11 +267,11 @@ function callCard(c) {
       ${c.action ? `<span class="chip act">${ACT[c.action]}</span>` : ""}</div></div>`;
 }
 function callTable(rows, review) {
-  return `<table><thead><tr><th>Thời gian</th><th>Số gọi đến</th><th>Kênh</th><th>Mức cao nhất</th><th>Khả năng giả</th><th>Nhân viên</th>${review ? "<th>Kết luận</th>" : ""}</tr></thead><tbody>
+  return `<div class="tablewrap"><table><thead><tr><th>Thời gian</th><th>Số gọi đến</th><th>Kênh</th><th>Mức cao nhất</th><th>Khả năng giả</th><th>Nhân viên</th>${review ? "<th>Kết luận</th>" : ""}</tr></thead><tbody>
     ${rows.map(c => `<tr class="click" data-id="${c.id}"><td class="num">${clock(c.started_at)}</td><td class="num">${esc(c.caller_masked)}<br><span class="chip ${c.category}">${CAT[c.category] || ""}</span></td>
       <td>${esc(CH[c.channel] || c.channel)}</td><td>${lvlTag(c.max_level)}</td><td class="num">${c.spoof_percent == null ? (c.screened_by === "prefilter" ? "chặn theo số" : "–") : Math.round(c.spoof_percent) + "%"}</td>
       <td>${c.action ? ACT[c.action] : "–"}</td>${review ? `<td>${c.verdict === "fraud" ? '<span class="lvl HIGH">Gian lận</span>' : c.verdict === "genuine" ? '<span class="lvl LOW">Khách thật</span>' : '<span class="lvl MEDIUM">Chờ kết luận</span>'}</td>` : ""}</tr>`).join("")}
-  </tbody></table>`;
+  </tbody></table></div>`;
 }
 function bindRows() { document.querySelectorAll("[data-id]").forEach(el => el.onclick = () => openCall(el.dataset.id)); }
 
@@ -325,7 +346,7 @@ async function renderOverview() {
 // ---------- drawer: one call ----------
 let drawerId = null;
 async function openCall(id) { drawerId = id; $("scrim").classList.add("on"); $("drawer").classList.add("on"); await refreshDrawer(); }
-function closeDrawer() { drawerId = null; $("scrim").classList.remove("on"); $("drawer").classList.remove("on"); }
+function closeDrawer() { $("recAudio")?.pause(); drawerId = null; $("scrim").classList.remove("on"); $("drawer").classList.remove("on"); }
 $("scrim").onclick = closeDrawer;
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeDrawer(); });
 async function refreshDrawer() {
@@ -337,9 +358,13 @@ async function refreshDrawer() {
     <div class="note">${CAT[c.category] || ""} · ${esc(CH[c.channel] || c.channel)} · bắt đầu ${clock(c.started_at)} · ${live ? "đang diễn ra" : "đã kết thúc"}, ${dur(c.duration_s)}</div>
     <div class="verdict ${l}"><div><b>${c.risk_level ? LEVEL[c.risk_level].i + " " + LEVEL[c.risk_level].w : "Đang nghe..."}</b>
       <p>${blocked ? "Số nằm trong blacklist: cuộc gọi bị chặn trước khi phân tích giọng." : c.risk_level ? ADVICE[c.risk_level] : "Cần khoảng 4 giây âm thanh để có kết luận đầu tiên."}</p></div>
-      ${c.spoof_percent != null ? `<div class="p">${Math.round(c.spoof_percent)}%<small style="display:block;font-size:12px;font-weight:600;text-align:right">khả năng giả</small></div>` : ""}</div>
+      ${c.spoof_percent != null ? `<div class="p">${Math.round(c.spoof_percent)}%<small style="display:block;font-size:12px;font-weight:600;text-align:right;white-space:nowrap">khả năng giả</small></div>` : ""}</div>
     ${c.spoof_percent != null && c.risk_level !== "LOW" && c.spoof_percent < 50 && ["unknown","hidden"].includes(c.category) ? `<p class="note">Mức được nâng lên vì số gọi đến chưa đăng ký hoặc bị ẩn, dù giọng nói chưa có dấu hiệu giả rõ rệt.</p>` : ""}
     ${c.windows.length ? `<h3>Diễn biến trong cuộc gọi</h3>${spark(c.windows, c.policy)}<p class="note">Mỗi điểm là một đoạn 4 giây; đường đứt vàng và đỏ là hai ngưỡng của kênh ${esc(CH[c.channel] || c.channel)}.</p>` : ""}
+    <h3>Nghe lại cuộc gọi</h3>
+    ${c.recording ? playerHtml(c) : `<p class="note">${live ? "Bản ghi có sau khi cuộc gọi kết thúc. Hệ thống chỉ giữ âm thanh của cuộc gọi cần xác minh hoặc rủi ro cao." :
+        ["MEDIUM", "HIGH"].includes(c.max_level) ? "Cuộc gọi này không có bản ghi (đã quá thời hạn lưu hoặc tắt ghi âm)." :
+        "Cuộc gọi bình thường không được lưu âm thanh."}${c.recording_ref ? ` Mã bản ghi của tổng đài: <code>${esc(c.recording_ref)}</code>.` : ""}</p>`}
     <h3>Nhân viên tổng đài</h3>
     <div class="acts">
       <button class="btn ${c.action === "continue" ? "primary" : ""}" data-act="continue">✓ Đã xác minh, tiếp tục</button>
@@ -360,9 +385,31 @@ async function refreshDrawer() {
       <dt>Mã cuộc gọi</dt><dd><code>${c.id}</code></dd>
     </dl>`;
   $("drawer").querySelector(".x").onclick = closeDrawer;
+  if (c.recording) bindPlayer(c);
   $("drawer").querySelectorAll("[data-act]").forEach(b => b.onclick = async () => { await post(`/v1/calls/${c.id}/action`, {action:b.dataset.act}); refreshDrawer(); });
   $("drawer").querySelectorAll("[data-ver]").forEach(b => b.onclick = async () => {
     await post(`/v1/calls/${c.id}/verdict`, {verdict:b.dataset.ver, note:$("vnote").value}); refreshDrawer(); if (view !== "live") render(); });
+}
+
+// ---------- playback ----------
+function playerHtml(c) {
+  const total = Math.max(c.duration_s || 0, ...c.windows.map(w => w.end), 1);
+  const hop = c.windows.length > 1 ? c.windows[1].start - c.windows[0].start : 4;
+  const suspects = c.windows.filter(w => w.level !== "LOW").sort((a, b) => a.score - b.score).slice(0, 6);
+  return `<audio id="recAudio" controls preload="metadata" src="/v1/calls/${c.id}/recording" style="width:100%"></audio>
+    <div class="segs" id="segs">${c.windows.map(w => `<button class="${w.level}" data-s="${w.start}" data-e="${w.end}"
+        style="left:${100 * w.start / total}%;width:calc(${100 * Math.min(hop, w.end - w.start) / total}% - 2px)"
+        title="${w.start.toFixed(0)}–${w.end.toFixed(0)} s: ${LEVEL[w.level].w}"></button>`).join("")}<div class="ph" id="ph"></div></div>
+    <div class="ticks"><span>0 s</span><span>${(total / 2).toFixed(0)} s</span><span>${total.toFixed(0)} s</span></div>
+    ${suspects.length ? `<div class="suspects">${suspects.map(w => `<button class="btn sm" data-s="${w.start}" data-e="${w.end}">▶ ${w.start.toFixed(0)}–${w.end.toFixed(0)} s · ${LEVEL[w.level].w}</button>`).join("")}</div>`
+                      : `<p class="note">Không đoạn nào vượt ngưỡng; mức của cuộc gọi đến từ số gọi đến.</p>`}
+    <p class="note">Bấm một đoạn để nghe lại đúng 4 giây đó. Đỏ: giống giọng giả; vàng: cần xác minh; xanh: bình thường.</p>`;
+}
+function bindPlayer(c) {
+  const a = $("recAudio"), total = Math.max(c.duration_s || 0, ...c.windows.map(w => w.end), 1);
+  let stopAt = null;
+  a.ontimeupdate = () => { $("ph").style.left = `${100 * a.currentTime / total}%`; if (stopAt !== null && a.currentTime >= stopAt) { a.pause(); stopAt = null; } };
+  $("drawer").querySelectorAll("[data-s]").forEach(b => b.onclick = () => { a.currentTime = +b.dataset.s; stopAt = +b.dataset.e; a.play(); });
 }
 
 // ---------- start ----------

@@ -294,18 +294,19 @@ function truthLine(d) {
 }
 
 function scaleSvg(score, p) {
-  const lo = Math.min(-12, Math.floor(score) - 1), hi = Math.max(8, Math.ceil(score) + 1), W = 600, H = 58;
-  const x = v => 10 + (v - lo) / (hi - lo) * (W - 20);
+  // The axis always shows both thresholds: per-channel thresholds of low-bitrate codecs reach -17.
+  const lo = Math.floor(Math.min(p.t_high - 3, score - 1)), hi = Math.ceil(Math.max(p.t_medium + 5, score + 1));
+  const W = 600, H = 70, x = v => 10 + (v - lo) / (hi - lo) * (W - 20);
   const zone = (a, b, cls) => `<rect x="${x(a)}" y="18" width="${x(b) - x(a)}" height="14" style="fill:var(--${cls}-bg)"/>`;
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Điểm ${score.toFixed(2)} so với hai ngưỡng">
     ${zone(lo, p.t_high, "high")}${zone(p.t_high, p.t_medium, "med")}${zone(p.t_medium, hi, "low")}
     <line x1="${x(p.t_high)}" x2="${x(p.t_high)}" y1="14" y2="36" stroke="var(--high)" stroke-width="1.5"/>
     <line x1="${x(p.t_medium)}" x2="${x(p.t_medium)}" y1="14" y2="36" stroke="var(--med)" stroke-width="1.5"/>
-    <text x="${x(p.t_high)}" y="50" text-anchor="middle">ngưỡng cao ${p.t_high.toFixed(2)}</text>
+    <text x="${x(p.t_high)}" y="49" text-anchor="middle">ngưỡng cao ${p.t_high.toFixed(2)}</text>
     <text x="${x(p.t_medium)}" y="10" text-anchor="middle">ngưỡng trung bình ${p.t_medium.toFixed(2)}</text>
     <line x1="${x(score)}" x2="${x(score)}" y1="12" y2="38" stroke="var(--fg)" stroke-width="3"/>
     <circle cx="${x(score)}" cy="25" r="5" style="fill:var(--fg)"/>
-    <text x="10" y="50">← giống giả</text><text x="${W - 10}" y="50" text-anchor="end">giống thật →</text>
+    <text x="10" y="66">← giống giả</text><text x="${W - 10}" y="66" text-anchor="end">giống thật →</text>
   </svg>`;
 }
 
@@ -326,8 +327,8 @@ function timelineSvg(segs, p) {
       <title>${s.start.toFixed(1)}–${s.end.toFixed(1)} s: điểm ${s.score.toFixed(2)}</title></circle>`).join("")}
     <line x1="${L}" x2="${W - R}" y1="${H - B}" y2="${H - B}" stroke="var(--line)"/>
     <text x="${L}" y="${H - 8}">0 s</text><text x="${W - R}" y="${H - 8}" text-anchor="end">${t1.toFixed(1)} s</text>
-    <text x="${L - 6}" y="${y(hi - 1) + 4}" text-anchor="end">${(hi - 1).toFixed(0)}</text>
-    <text x="${L - 6}" y="${y(lo + 1) + 4}" text-anchor="end">${(lo + 1).toFixed(0)}</text>
+    <text x="${L - 6}" y="${y(hi - 1) + 4}" text-anchor="end">${Math.round(hi - 1) || 0}</text>
+    <text x="${L - 6}" y="${y(lo + 1) + 4}" text-anchor="end">${Math.round(lo + 1) || 0}</text>
   </svg>`;
 }
 

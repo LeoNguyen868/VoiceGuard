@@ -237,7 +237,7 @@ function renderCheck() {
   if ($("checkFrame")) return;                                              // keep the tool's state across events
   $("view").innerHTML = `
     <div class="head"><div class="grow"><h1>Kiểm tra tệp</h1>
-      <p class="sub">Kiểm tra một tin nhắn thoại hoặc bản ghi khách hàng gửi tới: tải tệp, ghi âm, hoặc chọn mẫu thử.</p></div></div>
+      <p class="sub">Tin nhắn thoại hoặc bản ghi khách hàng gửi tới.</p></div></div>
     <iframe id="checkFrame" src="/check?embed=1" title="Kiểm tra tệp" style="width:100%;border:0;display:block;height:1200px"></iframe>`;
   const f = $("checkFrame");
   const fit = () => { try { f.style.height = f.contentDocument.documentElement.scrollHeight + "px"; } catch {} };
@@ -249,10 +249,10 @@ function renderLive() {
   const calls = [...active.values()].sort((a, b) => (order[a.risk_level] ?? 3) - (order[b.risk_level] ?? 3) || a.started_at - b.started_at);
   $("view").innerHTML = `
     <div class="head"><div class="grow"><h1>Cuộc gọi trực tiếp</h1>
-      <p class="sub">Mức rủi ro cập nhật mỗi 2 giây trong lúc nói chuyện. Cuộc gọi rủi ro cao được đưa lên đầu và có âm báo.</p></div>
+      <p class="sub">Cập nhật mỗi 2 giây.</p></div>
       <span class="chip">${calls.length} cuộc gọi đang diễn ra</span></div>
     ${calls.length ? `<div class="grid">${calls.map(callCard).join("")}</div>` :
-      `<div class="card empty">Chưa có cuộc gọi nào. Khi tổng đài chuyển cuộc gọi tới, chúng xuất hiện ở đây.<br><span class="note">Chạy thử: <code>python -m voiceguard.simulate --calls 20</code></span></div>`}
+      `<div class="card empty">Chưa có cuộc gọi nào.</div>`}
     <div class="section"><h2>Vừa kết thúc</h2>${recent.length ? `<div class="card">${callTable(recent, false)}</div>` : `<p class="note">Chưa có.</p>`}</div>`;
   calls.forEach(c => c.flash = false);
   bindRows();
@@ -280,10 +280,9 @@ async function renderReview() {
   const rows = await api(`/v1/calls?min_level=MEDIUM&status=ended&limit=300${reviewAll ? "" : "&unreviewed=true"}`);
   $("view").innerHTML = `
     <div class="head"><div class="grow"><h1>Hàng đợi điều tra</h1>
-      <p class="sub">Cuộc gọi đã kết thúc có mức cần xác minh hoặc rủi ro cao. Mở từng cuộc gọi, nghe bản ghi của tổng đài và kết luận.</p></div>
+      <p class="sub">Cuộc gọi cần xác minh hoặc rủi ro cao.</p></div>
       <div class="tabs"><button class="${reviewAll ? "" : "on"}" id="rq1">Chờ kết luận</button><button class="${reviewAll ? "on" : ""}" id="rq2">Tất cả</button></div></div>
-    <div class="card">${rows.length ? callTable(rows, true) : `<div class="empty">Không còn cuộc gọi nào chờ kết luận.</div>`}</div>
-    <p class="note">Kết luận "Gian lận" tự đưa số gọi đến vào blacklist. Kết luận "Khách thật" được dùng để tính lại ngưỡng theo kênh.</p>`;
+    <div class="card">${rows.length ? callTable(rows, true) : `<div class="empty">Không còn cuộc gọi nào chờ kết luận.</div>`}</div>`;
   $("rq1").onclick = () => { reviewAll = false; renderReview(); };
   $("rq2").onclick = () => { reviewAll = true; renderReview(); };
   bindRows();
@@ -295,7 +294,7 @@ async function renderNumbers() {
   const tab = (k, t) => `<button class="${numTab === k ? "on" : ""}" data-t="${k}">${t}</button>`;
   $("view").innerHTML = `
     <div class="head"><div class="grow"><h1>Danh sách số</h1>
-      <p class="sub">Số trong blacklist bị chặn ngay khi gọi tới, không cần chạy mô hình. Số đã đăng ký vẫn được kiểm tra vì số gọi đến có thể bị giả mạo.</p></div>
+      <p class="sub">Số trong blacklist bị chặn ngay khi gọi tới.</p></div>
       <div class="tabs">${tab("blacklist", "Blacklist")}${tab("registered", "Đã đăng ký")}${tab("suggested", "Đề xuất chặn")}</div></div>
     <div class="card">
       ${numTab !== "suggested" ? `<form class="form" id="addForm"><input name="number" placeholder="Số điện thoại" required inputmode="tel">
@@ -306,8 +305,7 @@ async function renderNumbers() {
           <td class="num">${n.last_call ? ago(n.last_call) + " trước" : "–"}</td>
           <td>${numTab === "suggested" ? `<button class="btn sm bad" data-add="${n.key}">Đưa vào blacklist</button>` : `<button class="btn sm" data-del="${n.key}">Gỡ</button>`}</td></tr>`).join("")}
       </tbody></table>` : `<div class="empty">${numTab === "suggested" ? "Chưa có số nào gọi tới nhiều lần với mức rủi ro cao." : "Danh sách trống."}</div>`}
-    </div>
-    <p class="note">Hệ thống không lưu số điện thoại gốc: chỉ giữ mã băm để đối chiếu và dạng đã che để hiển thị. Số được đề xuất khi gọi tới ít nhất 2 lần ở mức rủi ro cao trong 30 ngày; việc chặn do người quyết định.</p>`;
+    </div>`;
   document.querySelectorAll("[data-t]").forEach(b => b.onclick = () => { numTab = b.dataset.t; renderNumbers(); });
   document.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => { await api(`/v1/numbers/${b.dataset.del}?list=${numTab}`, {method:"DELETE"}); renderNumbers(); });
   document.querySelectorAll("[data-add]").forEach(b => b.onclick = async () => { await post("/v1/numbers", {key:b.dataset.add, list:"blacklist", note:"duyệt từ đề xuất"}); renderNumbers(); });
@@ -338,7 +336,7 @@ async function renderOverview() {
             <rect x="${x}" y="${130 - hh}" width="22" height="${hh}" style="fill:var(--bad)"/>
             ${i % 3 === 0 ? `<text x="${x + 11}" y="150" text-anchor="middle" style="fill:var(--muted);font-size:11px">${i}h</text>` : ""}</g>`; }).join("")}
       </svg>
-      <p class="note">Tính từ 24 giờ trước. Xám: bình thường; vàng: cần xác minh; đỏ: rủi ro cao.</p></div></div>
+      <p class="note">Xám: bình thường · Vàng: cần xác minh · Đỏ: rủi ro cao</p></div></div>
     <div class="section"><h2>Rủi ro cao gần đây</h2><div class="card">${callTable(await api("/v1/calls?min_level=HIGH&limit=10"), true)}</div></div>`;
   bindRows();
 }
@@ -359,8 +357,8 @@ async function refreshDrawer() {
     <div class="verdict ${l}"><div><b>${c.risk_level ? LEVEL[c.risk_level].i + " " + LEVEL[c.risk_level].w : "Đang nghe..."}</b>
       <p>${blocked ? "Số nằm trong blacklist: cuộc gọi bị chặn trước khi phân tích giọng." : c.risk_level ? ADVICE[c.risk_level] : "Cần khoảng 4 giây âm thanh để có kết luận đầu tiên."}</p></div>
       ${c.spoof_percent != null ? `<div class="p">${Math.round(c.spoof_percent)}%<small style="display:block;font-size:12px;font-weight:600;text-align:right;white-space:nowrap">khả năng giả</small></div>` : ""}</div>
-    ${c.spoof_percent != null && c.risk_level !== "LOW" && c.spoof_percent < 50 && ["unknown","hidden"].includes(c.category) ? `<p class="note">Mức được nâng lên vì số gọi đến chưa đăng ký hoặc bị ẩn, dù giọng nói chưa có dấu hiệu giả rõ rệt.</p>` : ""}
-    ${c.windows.length ? `<h3>Diễn biến trong cuộc gọi</h3>${spark(c.windows, c.policy)}<p class="note">Mỗi điểm là một đoạn 4 giây; đường đứt vàng và đỏ là hai ngưỡng của kênh ${esc(CH[c.channel] || c.channel)}.</p>` : ""}
+    ${c.spoof_percent != null && c.risk_level !== "LOW" && c.spoof_percent < 50 && ["unknown","hidden"].includes(c.category) ? `<p class="note">Nâng mức do số chưa đăng ký hoặc bị ẩn.</p>` : ""}
+    ${c.windows.length ? `<h3>Diễn biến trong cuộc gọi</h3>${spark(c.windows, c.policy)}` : ""}
     <h3>Nghe lại cuộc gọi</h3>
     ${c.recording ? playerHtml(c) : `<p class="note">${live ? "Bản ghi có sau khi cuộc gọi kết thúc. Hệ thống chỉ giữ âm thanh của cuộc gọi cần xác minh hoặc rủi ro cao." :
         ["MEDIUM", "HIGH"].includes(c.max_level) ? "Cuộc gọi này không có bản ghi (đã quá thời hạn lưu hoặc tắt ghi âm)." :
@@ -402,8 +400,7 @@ function playerHtml(c) {
         title="${w.start.toFixed(0)}–${w.end.toFixed(0)} s: ${LEVEL[w.level].w}"></button>`).join("")}<div class="ph" id="ph"></div></div>
     <div class="ticks"><span>0 s</span><span>${(total / 2).toFixed(0)} s</span><span>${total.toFixed(0)} s</span></div>
     ${suspects.length ? `<div class="suspects">${suspects.map(w => `<button class="btn sm" data-s="${w.start}" data-e="${w.end}">▶ ${w.start.toFixed(0)}–${w.end.toFixed(0)} s · ${LEVEL[w.level].w}</button>`).join("")}</div>`
-                      : `<p class="note">Không đoạn nào vượt ngưỡng; mức của cuộc gọi đến từ số gọi đến.</p>`}
-    <p class="note">Bấm một đoạn để nghe lại đúng 4 giây đó. Đỏ: giống giọng giả; vàng: cần xác minh; xanh: bình thường.</p>`;
+                      : `<p class="note">Không đoạn nào vượt ngưỡng.</p>`}`;
 }
 function bindPlayer(c) {
   const a = $("recAudio"), total = Math.max(c.duration_s || 0, ...c.windows.map(w => w.end), 1);

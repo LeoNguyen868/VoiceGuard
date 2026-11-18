@@ -147,7 +147,7 @@
     <div data-panel="rec" hidden>
       <div class="rec">
         <button class="recbtn" id="recBtn" aria-label="Bắt đầu ghi âm"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
-        <p class="hint" id="recHint">Bấm để ghi. Nói hoặc phát đoạn cần kiểm tra ít nhất 4 giây.</p>
+        <p class="hint" id="recHint">Bấm để ghi, nói ít nhất 4 giây.</p>
       </div>
     </div>
     <div data-panel="lib" hidden>
@@ -164,7 +164,6 @@
   <section class="card" aria-labelledby="s2">
     <h2 class="step" id="s2"><b>2</b>Đoạn âm thanh đến từ đâu?</h2>
     <div class="sources" id="sources"></div>
-    <p class="hint" style="text-align:left;margin-top:10px">Mỗi kênh nén giọng nói theo cách khác nhau; hệ thống dùng ngưỡng riêng cho từng kênh.</p>
   </section>
 
   <button class="cta" id="go" disabled>Kiểm tra giọng nói</button>
@@ -206,7 +205,7 @@ const audio = $("audio");
 fetch("/health").then(r => r.json()).then(h => {
   health = h;
   if (h.model?.random_weights)
-    $("banner").innerHTML = `<div class="banner">Chế độ thử giao diện: máy chủ chưa nạp mô hình thật, kết quả chỉ để xem cách hiển thị.</div>`;
+    $("banner").innerHTML = `<div class="banner">Chế độ thử: chưa nạp mô hình thật.</div>`;
   $("sources").innerHTML = SOURCES.map(s => {
     const ok = h.channel_info?.[s.ch]?.available !== false;
     return `<button class="src" data-ch="${s.ch}" aria-pressed="${s.ch === channel}" ${ok ? "" : "disabled title='Máy chủ chưa hỗ trợ kênh này'"}>
@@ -232,7 +231,7 @@ function renderSamples() {
     .map(([k,t]) => `<button data-lab="${k}" aria-pressed="${k === labSel}">${t}</button>`).join("");
   $("labFilter").onclick = e => { if (e.target.dataset.lab) { labSel = e.target.dataset.lab; renderSamples(); } };
   if (!samples.length) {
-    $("samples").innerHTML = `<p class="empty">Chưa có mẫu thử trên máy chủ. Người quản trị tạo bằng <code>python -m voiceguard.samples</code>.</p>`;
+    $("samples").innerHTML = `<p class="empty">Chưa có mẫu thử.</p>`;
     return;
   }
   const rows = samples.filter(s => labSel === "all" || s.label === labSel);
@@ -385,7 +384,7 @@ function render(d) {
         <p style="margin-top:12px"><button class="linkbtn" id="cmp">So sánh kết quả qua các kênh gọi</button></p>
         <div id="cmpOut"></div>
       </details>
-      <p class="note">Kết quả hỗ trợ ra quyết định và có thể sai. Luôn xác minh qua một kênh độc lập trước giao dịch quan trọng.</p>
+      <p class="note">Kết quả hỗ trợ quyết định và có thể sai.</p>
     </section>`;
   if ($("playWorst")) $("playWorst").onclick = () => playRange(worst.start, worst.end);
   $("cmp").onclick = compare;

@@ -6,383 +6,400 @@
 <title>VoiceGuard</title>
 <style>
   :root {
-    --bg:#f5f6f8; --card:#ffffff; --fg:#1b2129; --muted:#5d6774; --line:#dde2e8; --soft:#eef1f5;
-    --accent:#1f5fbf; --accent-fg:#ffffff;
-    --low:#1e7a3c; --low-bg:#e5f4ea; --med:#9a5b00; --med-bg:#fbf0dc; --high:#b42318; --high-bg:#fbe7e5;
-    --real:#1e7a3c; --fake:#b42318;
+    --bg:#f6f7f9; --card:#ffffff; --fg:#141a22; --muted:#5b6573; --line:#e3e7ec; --soft:#f0f2f5;
+    --accent:#2457c5; --accent-fg:#ffffff; --accent-soft:#e8eefb;
+    --ok:#1b7a3d; --ok-bg:#e7f5ec; --warn:#9a5a00; --warn-bg:#fdf1dd; --bad:#b4231a; --bad-bg:#fce9e7;
+    --wave:#c3cad4; --wave-played:#5b6573;
+    --radius:14px; --shadow:0 1px 2px rgba(20,26,34,.04), 0 4px 16px rgba(20,26,34,.06);
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg:#14181d; --card:#1c2128; --fg:#e6e9ed; --muted:#9aa4b0; --line:#2e353e; --soft:#242a32;
-      --accent:#5b9cff; --accent-fg:#0d1117;
-      --low:#5cc97f; --low-bg:#183323; --med:#f0b04f; --med-bg:#3a2c12; --high:#ff7b6e; --high-bg:#3d1c19;
-      --real:#5cc97f; --fake:#ff7b6e;
+      --bg:#0f1318; --card:#171c23; --fg:#e8ebef; --muted:#9aa3ae; --line:#29303a; --soft:#1f252d;
+      --accent:#6c9cff; --accent-fg:#0b0f14; --accent-soft:#1b2740;
+      --ok:#5fd08a; --ok-bg:#132a1d; --warn:#f2b45a; --warn-bg:#33270f; --bad:#ff8579; --bad-bg:#3a1916;
+      --wave:#3a434f; --wave-played:#9aa3ae; --shadow:none;
     }
   }
   * { box-sizing:border-box; }
-  body { margin:0; font:15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color:var(--fg); background:var(--bg); }
-  header { padding:20px 16px 8px; max-width:1200px; margin:0 auto; display:flex; flex-wrap:wrap; gap:8px 16px; align-items:baseline; }
-  header h1 { font-size:22px; margin:0; }
-  header p { margin:0; color:var(--muted); flex:1 1 320px; }
-  .chips { display:flex; flex-wrap:wrap; gap:6px; }
-  .chip { font-size:12px; padding:2px 8px; border-radius:999px; background:var(--soft); color:var(--muted); border:1px solid var(--line); }
-  main { max-width:1200px; margin:0 auto; padding:8px 16px 32px; display:grid; grid-template-columns:minmax(0,5fr) minmax(0,7fr); gap:16px; }
-  @media (max-width: 900px) { main { grid-template-columns:1fr; } }
-  section.card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; }
-  h2 { font-size:16px; margin:0 0 12px; }
-  h3 { font-size:14px; margin:16px 0 8px; color:var(--muted); font-weight:600; }
-  .tabs { display:flex; gap:4px; border-bottom:1px solid var(--line); margin-bottom:12px; }
-  .tabs button { border:0; background:none; padding:8px 12px; color:var(--muted); font:inherit; cursor:pointer; border-bottom:2px solid transparent; }
-  .tabs button[aria-selected=true] { color:var(--fg); border-bottom-color:var(--accent); font-weight:600; }
-  .filters { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
-  .filters button, .seg button { font:inherit; font-size:13px; padding:4px 10px; border-radius:999px; border:1px solid var(--line); background:var(--card); color:var(--fg); cursor:pointer; }
-  .filters button[aria-pressed=true] { background:var(--fg); color:var(--card); border-color:var(--fg); }
-  .list { display:flex; flex-direction:column; gap:8px; max-height:560px; overflow:auto; padding-right:4px; }
-  .sample { border:1px solid var(--line); border-radius:8px; padding:10px; display:grid; grid-template-columns:1fr auto; gap:6px 8px; cursor:pointer; }
-  .sample[aria-selected=true] { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
-  .sample .meta { font-size:13px; color:var(--muted); }
-  .sample audio { grid-column:1 / -1; width:100%; height:32px; }
-  .tag { display:inline-block; font-size:12px; font-weight:600; padding:1px 8px; border-radius:4px; margin-right:6px; }
-  .tag.real { color:var(--real); background:var(--low-bg); }
-  .tag.fake { color:var(--fake); background:var(--high-bg); }
-  .empty { color:var(--muted); font-size:14px; }
-  code { background:var(--soft); padding:1px 4px; border-radius:4px; font-size:13px; }
-  .drop { border:2px dashed var(--line); border-radius:10px; padding:24px; text-align:center; color:var(--muted); cursor:pointer; }
-  .drop.over { border-color:var(--accent); color:var(--fg); }
-  .channels { display:grid; grid-template-columns:repeat(auto-fill, minmax(170px, 1fr)); gap:8px; }
-  .ch { text-align:left; font:inherit; border:1px solid var(--line); border-radius:8px; padding:8px 10px; background:var(--card); color:var(--fg); cursor:pointer; }
-  .ch strong { display:block; font-size:14px; }
-  .ch span { font-size:12px; color:var(--muted); }
-  .ch[aria-pressed=true] { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
-  .ch:disabled { opacity:.45; cursor:not-allowed; }
-  .actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; align-items:center; }
-  .btn { font:inherit; font-weight:600; padding:9px 16px; border-radius:8px; border:1px solid var(--accent); cursor:pointer; }
-  .btn.primary { background:var(--accent); color:var(--accent-fg); }
-  .btn.secondary { background:var(--card); color:var(--accent); }
-  .btn:disabled { opacity:.5; cursor:not-allowed; }
-  .picked { font-size:13px; color:var(--muted); }
-  details { margin-top:12px; font-size:14px; }
-  details label { display:block; margin:8px 0 4px; font-weight:600; }
-  select, input[type=text] { font:inherit; padding:6px 8px; border:1px solid var(--line); border-radius:6px; background:var(--card); color:var(--fg); width:100%; }
-  .verdict { display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px; padding:12px; border-radius:8px; margin-bottom:12px; }
-  .verdict.LOW { background:var(--low-bg); } .verdict.MEDIUM { background:var(--med-bg); } .verdict.HIGH { background:var(--high-bg); }
-  .verdict .level { font-size:20px; font-weight:700; }
-  .LOW .level, td.LOW { color:var(--low); } .MEDIUM .level, td.MEDIUM { color:var(--med); } .HIGH .level, td.HIGH { color:var(--high); }
-  .verdict .action { flex:1 1 260px; }
-  .truth { font-size:14px; margin:0 0 10px; }
-  .ok { color:var(--low); font-weight:600; } .miss { color:var(--high); font-weight:600; }
-  .warn { color:var(--high); font-weight:600; font-size:14px; }
-  .facts { display:flex; flex-wrap:wrap; gap:6px 18px; font-size:13px; color:var(--muted); margin:8px 0; }
-  .facts b { color:var(--fg); font-weight:600; }
-  svg text { fill:var(--muted); font-size:11px; }
-  table { border-collapse:collapse; width:100%; font-size:14px; }
-  th, td { border-bottom:1px solid var(--line); padding:6px 8px; text-align:right; }
-  th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align:left; }
-  th { color:var(--muted); font-weight:600; }
-  .note { font-size:12px; color:var(--muted); margin-top:8px; }
-  .spin { display:inline-block; width:14px; height:14px; border:2px solid var(--line); border-top-color:var(--accent); border-radius:50%; animation:r 0.8s linear infinite; vertical-align:-2px; margin-right:6px; }
+  html, body { margin:0; background:var(--bg); color:var(--fg); }
+  body { font:16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  button { font:inherit; color:inherit; }
+  .wrap { max-width:760px; margin:0 auto; padding:28px 16px 48px; }
+  header { display:flex; align-items:center; gap:12px; margin-bottom:6px; }
+  header svg { flex:none; }
+  header h1 { font-size:22px; margin:0; letter-spacing:-.01em; }
+  .tagline { color:var(--muted); margin:0 0 24px; }
+  .banner { font-size:14px; background:var(--warn-bg); color:var(--warn); border-radius:10px; padding:8px 12px; margin-bottom:16px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:20px; margin-bottom:16px; }
+  .step { display:flex; align-items:baseline; gap:10px; margin:0 0 14px; font-size:17px; }
+  .step b { display:inline-grid; place-items:center; width:26px; height:26px; border-radius:50%; background:var(--accent-soft); color:var(--accent); font-size:14px; flex:none; }
+  .seg { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; background:var(--soft); padding:4px; border-radius:12px; margin-bottom:14px; }
+  .seg button { border:0; background:none; padding:9px 6px; border-radius:9px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; color:var(--muted); }
+  .seg button[aria-selected=true] { background:var(--card); color:var(--fg); font-weight:600; box-shadow:var(--shadow); }
+  .drop { display:flex; flex-direction:column; align-items:center; gap:6px; border:2px dashed var(--line); border-radius:12px; padding:28px 16px; text-align:center; color:var(--muted); cursor:pointer; }
+  .drop:hover, .drop.over { border-color:var(--accent); color:var(--fg); background:var(--accent-soft); }
+  .drop strong { color:var(--fg); }
+  .rec { display:flex; flex-direction:column; align-items:center; gap:10px; padding:16px 0 6px; }
+  .recbtn { width:72px; height:72px; border-radius:50%; border:0; background:var(--bad); color:#fff; cursor:pointer; display:grid; place-items:center; }
+  .recbtn.on { animation:pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { box-shadow:0 0 0 0 rgba(180,35,26,.35); } 50% { box-shadow:0 0 0 14px rgba(180,35,26,0); } }
+  .hint { font-size:14px; color:var(--muted); text-align:center; margin:0; }
+  .chips { display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; }
+  .chips button { border:1px solid var(--line); background:var(--card); padding:4px 12px; border-radius:999px; cursor:pointer; font-size:14px; }
+  .chips button[aria-pressed=true] { background:var(--fg); color:var(--card); border-color:var(--fg); }
+  .samples { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:8px; max-height:300px; overflow:auto; }
+  .sample { display:flex; align-items:center; gap:10px; text-align:left; border:1px solid var(--line); background:var(--card); border-radius:10px; padding:10px; cursor:pointer; }
+  .sample:hover { border-color:var(--accent); }
+  .sample[aria-pressed=true] { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+  .sample .ic { flex:none; width:34px; height:34px; border-radius:50%; display:grid; place-items:center; background:var(--soft); color:var(--muted); }
+  .sample small { display:block; color:var(--muted); font-size:13px; }
+  .empty { color:var(--muted); font-size:14px; margin:4px 0; }
+  code { background:var(--soft); padding:1px 5px; border-radius:5px; font-size:13px; }
+  .player { display:flex; align-items:center; gap:12px; margin-top:16px; padding:10px 12px; border:1px solid var(--line); border-radius:12px; }
+  .player[hidden] { display:none; }
+  .play { flex:none; width:40px; height:40px; border-radius:50%; border:0; background:var(--fg); color:var(--card); cursor:pointer; display:grid; place-items:center; }
+  .wavebox { flex:1; min-width:0; }
+  .wavebox .name { font-size:14px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:2px; }
+  canvas.wave { width:100%; height:56px; display:block; cursor:pointer; }
+  .sources { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px; }
+  .src { text-align:left; border:1px solid var(--line); background:var(--card); border-radius:12px; padding:12px; cursor:pointer; display:flex; flex-direction:column; gap:6px; }
+  .src:hover { border-color:var(--accent); }
+  .src[aria-pressed=true] { border-color:var(--accent); background:var(--accent-soft); }
+  .src:disabled { opacity:.45; cursor:not-allowed; }
+  .src svg { color:var(--accent); }
+  .src span { font-size:13px; color:var(--muted); }
+  .cta { width:100%; margin-top:6px; padding:15px; border:0; border-radius:12px; background:var(--accent); color:var(--accent-fg); font-weight:700; font-size:17px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px; }
+  .cta:disabled { opacity:.45; cursor:not-allowed; }
+  .spin { width:18px; height:18px; border:2.5px solid currentColor; border-right-color:transparent; border-radius:50%; animation:r .8s linear infinite; }
   @keyframes r { to { transform:rotate(360deg); } }
-  .rec { display:flex; align-items:center; gap:12px; }
-  .rec .dot { width:10px; height:10px; border-radius:50%; background:var(--high); visibility:hidden; }
-  .rec.on .dot { visibility:visible; animation:b 1s infinite; }
-  @keyframes b { 50% { opacity:.2; } }
+  .verdict { border-radius:var(--radius); padding:22px; margin-bottom:16px; display:grid; grid-template-columns:auto 1fr; gap:4px 16px; align-items:center; }
+  .verdict.LOW { background:var(--ok-bg); color:var(--ok); }
+  .verdict.MEDIUM { background:var(--warn-bg); color:var(--warn); }
+  .verdict.HIGH { background:var(--bad-bg); color:var(--bad); }
+  .verdict svg { grid-row:span 2; }
+  .verdict h2 { margin:0; font-size:26px; line-height:1.2; letter-spacing:-.01em; }
+  .verdict p { margin:0; color:var(--fg); }
+  .gauge { margin:4px 0 18px; }
+  .gauge .bar { position:relative; height:10px; border-radius:99px; background:linear-gradient(90deg, var(--bad) 0%, var(--warn) 50%, var(--ok) 100%); opacity:.85; }
+  .gauge .dot { position:absolute; top:50%; width:20px; height:20px; border-radius:50%; background:var(--card); border:4px solid var(--fg); transform:translate(-50%,-50%); }
+  .gauge .labels { display:flex; justify-content:space-between; font-size:13px; color:var(--muted); margin-top:6px; }
+  .todo { margin:0; padding-left:20px; }
+  .todo li { margin:4px 0; }
+  h3 { font-size:15px; margin:18px 0 8px; }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:13px; color:var(--muted); margin-top:6px; }
+  .legend i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
+  .linkbtn { border:0; background:none; color:var(--accent); cursor:pointer; padding:0; font-weight:600; }
+  .truth { font-size:14px; border-top:1px solid var(--line); padding-top:12px; margin-top:16px; color:var(--muted); }
+  .truth b.ok { color:var(--ok); } .truth b.bad { color:var(--bad); }
+  details.tech { margin-top:16px; border-top:1px solid var(--line); padding-top:12px; }
+  details.tech summary { cursor:pointer; color:var(--muted); font-size:14px; }
+  .kv { display:grid; grid-template-columns:auto 1fr; gap:4px 16px; font-size:14px; margin-top:10px; }
+  .kv dt { color:var(--muted); } .kv dd { margin:0; }
+  table { border-collapse:collapse; width:100%; font-size:14px; margin-top:10px; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); }
+  th { color:var(--muted); font-weight:600; }
+  .pill { display:inline-block; padding:1px 8px; border-radius:99px; font-size:13px; font-weight:600; }
+  .pill.LOW { background:var(--ok-bg); color:var(--ok); } .pill.MEDIUM { background:var(--warn-bg); color:var(--warn); } .pill.HIGH { background:var(--bad-bg); color:var(--bad); }
+  .note { font-size:13px; color:var(--muted); margin-top:14px; }
+  .err { color:var(--bad); font-weight:600; }
+  .visually-hidden { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
 </style>
 </head>
 <body>
-<header>
-  <h1>VoiceGuard</h1>
-  <p>Giám định giọng nói nhân bản trên kênh thoại doanh nghiệp</p>
-  <div class="chips" id="modelChips"></div>
-</header>
-<main>
-  <section class="card" aria-labelledby="srcTitle">
-    <h2 id="srcTitle">Âm thanh cần kiểm tra</h2>
-    <div class="tabs" role="tablist">
-      <button role="tab" aria-selected="true" data-tab="lib">Thư viện mẫu</button>
-      <button role="tab" aria-selected="false" data-tab="up">Tải tệp</button>
-      <button role="tab" aria-selected="false" data-tab="rec">Ghi âm</button>
+<div class="wrap">
+  <header>
+    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z" fill="var(--accent)"/><path d="M8 12h1m2-3v6m2-4v2m2-3v4" stroke="var(--accent-fg)" stroke-width="1.8" stroke-linecap="round"/></svg>
+    <h1>VoiceGuard</h1>
+  </header>
+  <p class="tagline">Kiểm tra một đoạn giọng nói là của người thật hay do AI nhân bản.</p>
+  <div id="banner"></div>
+
+  <!-- Bước 1 -->
+  <section class="card" aria-labelledby="s1">
+    <h2 class="step" id="s1"><b>1</b>Chọn đoạn âm thanh</h2>
+    <div class="seg" role="tablist">
+      <button role="tab" aria-selected="true" data-tab="up"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 16V4m0 0-4 4m4-4 4 4M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>Tải tệp</button>
+      <button role="tab" aria-selected="false" data-tab="rec"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>Ghi âm</button>
+      <button role="tab" aria-selected="false" data-tab="lib"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></svg>Mẫu thử</button>
     </div>
-    <div data-panel="lib">
-      <div class="filters" id="dsFilter"></div>
-      <div class="filters" id="labFilter"></div>
-      <div class="list" id="sampleList"></div>
-    </div>
-    <div data-panel="up" hidden>
-      <label class="drop" id="drop">Kéo thả tệp âm thanh vào đây hoặc bấm để chọn (wav, flac, mp3, ogg, m4a...)
-        <input id="file" type="file" accept="audio/*" hidden>
+    <div data-panel="up">
+      <label class="drop" id="drop">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 16V4m0 0-4 4m4-4 4 4M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+        <span><strong>Kéo thả tệp vào đây</strong> hoặc bấm để chọn</span>
+        <span style="font-size:13px">Tin nhắn thoại, bản ghi cuộc gọi: mp3, m4a, ogg, wav...</span>
+        <input id="file" type="file" accept="audio/*,video/*" class="visually-hidden">
       </label>
-      <audio id="upPreview" controls hidden style="width:100%;margin-top:10px"></audio>
     </div>
     <div data-panel="rec" hidden>
-      <div class="rec" id="recBox">
-        <button class="btn secondary" id="recBtn">Bắt đầu ghi</button><span class="dot"></span><span id="recTime">0.0 s</span>
+      <div class="rec">
+        <button class="recbtn" id="recBtn" aria-label="Bắt đầu ghi âm"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></button>
+        <p class="hint" id="recHint">Bấm để ghi. Nói hoặc phát đoạn cần kiểm tra ít nhất 4 giây.</p>
       </div>
-      <p class="note">Nói ít nhất 4 giây. Âm thanh chỉ được gửi tới máy chủ VoiceGuard để phân tích và không được lưu.</p>
-      <audio id="recPreview" controls hidden style="width:100%;margin-top:10px"></audio>
+    </div>
+    <div data-panel="lib" hidden>
+      <div class="chips" id="labFilter"></div>
+      <div class="samples" id="samples"></div>
+    </div>
+    <div class="player" id="player" hidden>
+      <button class="play" id="playBtn" aria-label="Phát"><svg id="playIc" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"/></svg></button>
+      <div class="wavebox"><div class="name" id="clipName"></div><canvas class="wave" id="wave" height="56"></canvas></div>
     </div>
   </section>
 
-  <section class="card" aria-labelledby="chTitle">
-    <h2 id="chTitle">Kênh truyền mô phỏng</h2>
-    <div class="channels" id="channels"></div>
-    <details>
-      <summary>Tùy chọn nâng cao</summary>
-      <label for="mode">Chế độ phân tích</label>
-      <select id="mode">
-        <option value="window">Cửa sổ trượt 4 s, bước 2 s (sàng lọc cuộc gọi)</option>
-        <option value="full">Toàn bộ tệp một lần (giao thức benchmark)</option>
-      </select>
-      <label for="caller">Số gọi đến (lớp lọc theo số)</label>
-      <input id="caller" type="text" inputmode="tel" placeholder="Bỏ trống nếu không có">
-    </details>
-    <div class="actions">
-      <button class="btn primary" id="analyze" disabled>Phân tích</button>
-      <button class="btn secondary" id="compare" disabled>So sánh qua các kênh</button>
-      <span class="picked" id="picked">Chưa chọn âm thanh</span>
-    </div>
-    <div id="out"></div>
+  <!-- Bước 2 -->
+  <section class="card" aria-labelledby="s2">
+    <h2 class="step" id="s2"><b>2</b>Đoạn âm thanh đến từ đâu?</h2>
+    <div class="sources" id="sources"></div>
+    <p class="hint" style="text-align:left;margin-top:10px">Mỗi kênh nén giọng nói theo cách khác nhau; hệ thống dùng ngưỡng riêng cho từng kênh.</p>
   </section>
-</main>
+
+  <button class="cta" id="go" disabled>Kiểm tra giọng nói</button>
+
+  <div id="result" style="margin-top:20px"></div>
+</div>
+
+<audio id="audio" preload="auto"></audio>
 <script>
-const CH = {
-  none:   {name:"Âm thanh gốc", app:"Tệp ghi âm 16 kHz"},
-  g711u:  {name:"G.711 μ-law", app:"Tổng đài, điện thoại cố định"},
-  g711a:  {name:"G.711 A-law", app:"Tổng đài châu Âu, châu Á"},
-  nb8k:   {name:"Băng hẹp 8 kHz", app:"Chỉ giới hạn băng tần"},
-  gsm:    {name:"GSM 06.10", app:"Di động 2G"},
-  amrnb:  {name:"AMR-NB 12.2 kbit/s", app:"Di động 3G, 4G"},
-  amrwb:  {name:"AMR-WB 12.65 kbit/s", app:"VoLTE, thoại HD"},
-  g722:   {name:"G.722", app:"Tổng đài IP HD"},
-  opus12: {name:"Opus 12 kbit/s", app:"Zalo, Messenger"},
-  mp3_32: {name:"MP3 32 kbit/s", app:"Tin nhắn thoại"},
+// Kênh hiển thị cho người dùng: tên quen thuộc, ánh xạ sang mô phỏng codec của máy chủ.
+const SOURCES = [
+  {ch:"none",   name:"Tệp ghi âm",          sub:"Thu trực tiếp, chưa qua cuộc gọi", icon:"M9 18V5l11-2v13M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm11-2a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"},
+  {ch:"opus12", name:"Zalo, Messenger",     sub:"Gọi qua Internet",                 icon:"M4 5h16v11H8l-4 4V5Z"},
+  {ch:"amrnb",  name:"Điện thoại di động",  sub:"Cuộc gọi 3G, 4G thường",           icon:"M8 2h8a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Zm3 17h2"},
+  {ch:"amrwb",  name:"Gọi VoLTE, HD",       sub:"Di động chất lượng cao",           icon:"M8 2h8a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Zm2 6h4m-4 3h4"},
+  {ch:"g711u",  name:"Tổng đài, máy bàn",   sub:"Điện thoại cố định",               icon:"M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z"},
+  {ch:"gsm",    name:"Di động 2G",          sub:"Sóng yếu, mạng cũ",                icon:"M2 20h2m3 0V16m4 4v-8m4 8V9m4 11V5"},
+];
+const VERDICT = {
+  LOW:    {title:"Có vẻ là giọng người thật", text:"Không thấy dấu hiệu rõ ràng của giọng nhân bản.",
+           todo:["Tiếp tục bình thường.", "Với giao dịch lớn, vẫn nên xác minh qua một kênh khác."],
+           icon:'<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg>'},
+  MEDIUM: {title:"Cần xác minh thêm", text:"Một số đoạn có dấu hiệu bất thường, chưa đủ để kết luận.",
+           todo:["Gọi lại vào số điện thoại đã đăng ký của người này.", "Hỏi một thông tin chỉ người thật mới biết.", "Chưa chuyển tiền hay cung cấp mã OTP cho tới khi xác minh xong."],
+           icon:'<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4m0 3h.01"/></svg>'},
+  HIGH:   {title:"Nhiều khả năng là giọng giả", text:"Giọng nói có đặc điểm của giọng do AI tạo ra.",
+           todo:["Không chuyển tiền, không cung cấp mã OTP hay mật khẩu.", "Dừng giao dịch và báo bộ phận chống gian lận.", "Liên hệ người này qua kênh khác để xác nhận."],
+           icon:'<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2h8l6 6v8l-6 6H8l-6-6V8l6-6Z"/><path d="m9 9 6 6m0-6-6 6"/></svg>'},
 };
-const COMPARE = ["none", "g711u", "gsm", "amrnb", "amrwb", "opus12", "mp3_32"];
-const LEVEL = {LOW:"Rủi ro thấp", MEDIUM:"Rủi ro trung bình", HIGH:"Rủi ro cao"};
+const LEVEL_WORD = {LOW:"Thật", MEDIUM:"Cần xác minh", HIGH:"Giả"};
+const CH_NAME = {none:"Tệp ghi âm", nb8k:"Băng hẹp 8 kHz", g711u:"Tổng đài (G.711)", g711a:"G.711 A-law", gsm:"Di động 2G (GSM)",
+  amrnb:"Di động 3G, 4G (AMR-NB)", amrwb:"VoLTE (AMR-WB)", g722:"Tổng đài IP (G.722)", opus12:"Zalo, Messenger (Opus)", mp3_32:"Tin nhắn thoại (MP3)"};
 const $ = id => document.getElementById(id);
-let health = null, samples = [], current = null, channel = "none", dsSel = "all", labSel = "all";
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let health = null, samples = [], labSel = "all", current = null, channel = "none", last = null, peaks = null, levels = null;
+const audio = $("audio");
 
-function esc(s) { return String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+// ---------- trạng thái máy chủ ----------
+fetch("/health").then(r => r.json()).then(h => {
+  health = h;
+  if (h.model?.random_weights)
+    $("banner").innerHTML = `<div class="banner">Chế độ thử giao diện: máy chủ chưa nạp mô hình thật, kết quả chỉ để xem cách hiển thị.</div>`;
+  $("sources").innerHTML = SOURCES.map(s => {
+    const ok = h.channel_info?.[s.ch]?.available !== false;
+    return `<button class="src" data-ch="${s.ch}" aria-pressed="${s.ch === channel}" ${ok ? "" : "disabled title='Máy chủ chưa hỗ trợ kênh này'"}>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${s.icon}"/></svg>
+      <b>${s.name}</b><span>${s.sub}</span></button>`;
+  }).join("");
+  document.querySelectorAll(".src").forEach(b => b.onclick = () => {
+    channel = b.dataset.ch;
+    document.querySelectorAll(".src").forEach(x => x.setAttribute("aria-pressed", x === b));
+  });
+});
 
-// ---------- tabs ----------
-document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
-  document.querySelectorAll(".tabs button").forEach(x => x.setAttribute("aria-selected", x === b));
+// ---------- tab ----------
+document.querySelectorAll(".seg button").forEach(b => b.onclick = () => {
+  document.querySelectorAll(".seg button").forEach(x => x.setAttribute("aria-selected", x === b));
   document.querySelectorAll("[data-panel]").forEach(p => p.hidden = p.dataset.panel !== b.dataset.tab);
 });
 
-// ---------- health, channels ----------
-fetch("/health").then(r => r.json()).then(h => {
-  health = h;
-  const m = h.model || {};
-  const chips = [];
-  if (m.random_weights) chips.push("Trọng số ngẫu nhiên (chỉ để thử giao diện)");
-  else chips.push(`Encoder ${m.num_layers ?? "?"} lớp`);
-  chips.push(h.device.toUpperCase() + (h.fp16 ? " · FP16" : ""));
-  chips.push(h.policy.calibrated ? "Ngưỡng đã hiệu chỉnh theo kênh" : "Ngưỡng chưa hiệu chỉnh");
-  $("modelChips").innerHTML = chips.map(c => `<span class="chip">${esc(c)}</span>`).join("");
-  $("channels").innerHTML = h.channels.map(c => {
-    const info = h.channel_info?.[c] || {}, d = CH[c] || {name:c, app:""};
-    return `<button class="ch" data-ch="${c}" aria-pressed="${c === channel}" ${info.available === false ? "disabled title='ffmpeg trên máy chủ không có encoder này'" : ""}>
-      <strong>${esc(d.name)}</strong><span>${esc(d.app)}${info.calibrated ? "" : " · ngưỡng chung"}</span></button>`;
-  }).join("");
-  document.querySelectorAll(".ch").forEach(b => b.onclick = () => {
-    channel = b.dataset.ch;
-    document.querySelectorAll(".ch").forEach(x => x.setAttribute("aria-pressed", x === b));
-  });
-});
-
-// ---------- sample library ----------
-fetch("/v1/samples").then(r => r.json()).then(list => {
-  samples = list;
-  const ds = [...new Map(list.map(s => [s.dataset, s.dataset_title])).entries()];
-  $("dsFilter").innerHTML = [["all", "Tất cả"], ...ds].map(([k, t]) =>
-    `<button data-ds="${k}" aria-pressed="${k === dsSel}">${esc(t)}</button>`).join("");
-  $("labFilter").innerHTML = [["all", "Thật và giả"], ["bonafide", "Giọng thật"], ["spoof", "Giọng giả"]].map(([k, t]) =>
-    `<button data-lab="${k}" aria-pressed="${k === labSel}">${t}</button>`).join("");
-  $("dsFilter").onclick = e => { if (e.target.dataset.ds) { dsSel = e.target.dataset.ds; renderSamples(); } };
-  $("labFilter").onclick = e => { if (e.target.dataset.lab) { labSel = e.target.dataset.lab; renderSamples(); } };
-  renderSamples();
-});
-
+// ---------- mẫu thử ----------
+fetch("/v1/samples").then(r => r.json()).then(list => { samples = list; renderSamples(); });
 function renderSamples() {
-  document.querySelectorAll("#dsFilter button").forEach(b => b.setAttribute("aria-pressed", b.dataset.ds === dsSel));
-  document.querySelectorAll("#labFilter button").forEach(b => b.setAttribute("aria-pressed", b.dataset.lab === labSel));
+  $("labFilter").innerHTML = [["all","Tất cả"],["bonafide","Giọng thật"],["spoof","Giọng giả"]]
+    .map(([k,t]) => `<button data-lab="${k}" aria-pressed="${k === labSel}">${t}</button>`).join("");
+  $("labFilter").onclick = e => { if (e.target.dataset.lab) { labSel = e.target.dataset.lab; renderSamples(); } };
   if (!samples.length) {
-    $("sampleList").innerHTML = `<p class="empty">Chưa có thư viện mẫu. Tạo bằng <code>python -m voiceguard.samples</code> từ bản sao các bộ dữ liệu trên máy (xem README), hoặc dùng thẻ Tải tệp, Ghi âm.</p>`;
+    $("samples").innerHTML = `<p class="empty">Chưa có mẫu thử trên máy chủ. Người quản trị tạo bằng <code>python -m voiceguard.samples</code>.</p>`;
     return;
   }
-  const rows = samples.filter(s => (dsSel === "all" || s.dataset === dsSel) && (labSel === "all" || s.label === labSel));
-  $("sampleList").innerHTML = rows.map(s => `
-    <div class="sample" data-id="${s.id}" aria-selected="${current?.sample?.id === s.id}" tabindex="0">
-      <div><span class="tag ${s.label === "spoof" ? "fake" : "real"}">${s.label === "spoof" ? "Giả" : "Thật"}</span>
-        <b>${esc(s.dataset_title)}</b>
-        <div class="meta">${esc(s.detail || s.original)} · ${s.duration_s.toFixed(1)} s</div></div>
-      <button class="btn secondary" style="padding:4px 10px">Chọn</button>
-      <audio controls preload="none" src="/samples/${encodeURIComponent(s.file)}"></audio>
-    </div>`).join("") || `<p class="empty">Không có mẫu nào khớp bộ lọc.</p>`;
-  document.querySelectorAll(".sample").forEach(el => {
-    const pick = () => selectSample(samples.find(s => s.id === el.dataset.id));
-    el.querySelector("button").onclick = e => { e.stopPropagation(); pick(); };
-    el.onkeydown = e => { if (e.key === "Enter") pick(); };
+  const rows = samples.filter(s => labSel === "all" || s.label === labSel);
+  $("samples").innerHTML = rows.map(s => `
+    <button class="sample" data-id="${s.id}" aria-pressed="${current?.sample?.id === s.id}">
+      <span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4v16l13-8z"/></svg></span>
+      <span><b>${s.label === "spoof" ? "Giọng giả" : "Giọng thật"}</b><small>${esc(s.dataset_title)}${s.detail ? " · " + esc(s.detail) : ""} · ${s.duration_s.toFixed(0)} s</small></span>
+    </button>`).join("") || `<p class="empty">Không có mẫu nào.</p>`;
+  document.querySelectorAll(".sample").forEach(el => el.onclick = async () => {
+    const s = samples.find(x => x.id === el.dataset.id);
+    const blob = await (await fetch(`/samples/${encodeURIComponent(s.file)}`)).blob();
+    await setClip({blob, name:s.file, sample:s}, `Mẫu thử: ${s.label === "spoof" ? "giọng giả" : "giọng thật"} · ${s.dataset_title}`);
+    renderSamples();
   });
 }
 
-async function selectSample(s) {
-  const blob = await (await fetch(`/samples/${encodeURIComponent(s.file)}`)).blob();
-  setCurrent({blob, name:s.file, sample:s}, `${s.label === "spoof" ? "Giả" : "Thật"} · ${s.dataset_title} · ${s.detail || s.original}`);
-  renderSamples();
-}
-
-function setCurrent(c, label) {
-  current = c;
-  $("picked").textContent = "Đã chọn: " + label;
-  $("analyze").disabled = $("compare").disabled = false;
-}
-
-// ---------- upload ----------
+// ---------- tải tệp ----------
 const drop = $("drop");
-$("file").onchange = () => useFile($("file").files[0]);
+$("file").onchange = () => $("file").files[0] && setClip({blob:$("file").files[0], name:$("file").files[0].name}, $("file").files[0].name);
 drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
 drop.ondragleave = () => drop.classList.remove("over");
-drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); useFile(e.dataTransfer.files[0]); };
-function useFile(f) {
-  if (!f) return;
-  $("upPreview").src = URL.createObjectURL(f); $("upPreview").hidden = false;
-  setCurrent({blob:f, name:f.name}, f.name);
-}
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); const f = e.dataTransfer.files[0]; if (f) setClip({blob:f, name:f.name}, f.name); };
 
-// ---------- record ----------
-let rec = null, chunks = [], t0 = 0, timer = null;
+// ---------- ghi âm ----------
+let rec = null, chunks = [], t0 = 0, tick = null;
 $("recBtn").onclick = async () => {
   if (rec) { rec.stop(); return; }
   let stream;
   try { stream = await navigator.mediaDevices.getUserMedia({audio:true}); }
-  catch { $("recTime").textContent = "Trình duyệt không cho phép dùng micro"; return; }
+  catch { $("recHint").textContent = "Trình duyệt chưa cho phép dùng micro."; return; }
   chunks = []; rec = new MediaRecorder(stream);
   rec.ondataavailable = e => chunks.push(e.data);
-  rec.onstop = () => {
-    stream.getTracks().forEach(t => t.stop()); clearInterval(timer);
-    $("recBox").classList.remove("on"); $("recBtn").textContent = "Ghi lại";
+  rec.onstop = async () => {
+    stream.getTracks().forEach(t => t.stop()); clearInterval(tick);
+    $("recBtn").classList.remove("on"); $("recBtn").setAttribute("aria-label", "Ghi lại");
     const blob = new Blob(chunks, {type:rec.mimeType}); rec = null;
-    $("recPreview").src = URL.createObjectURL(blob); $("recPreview").hidden = false;
     const ext = blob.type.includes("ogg") ? "ogg" : blob.type.includes("mp4") ? "m4a" : "webm";
-    setCurrent({blob, name:`ghi-am.${ext}`}, `Ghi âm ${$("recTime").textContent}`);
+    $("recHint").textContent = "Đã ghi xong. Bấm lần nữa để ghi lại.";
+    await setClip({blob, name:`ghi-am.${ext}`}, "Bản ghi âm vừa thu");
   };
-  rec.start(); t0 = Date.now(); $("recBox").classList.add("on"); $("recBtn").textContent = "Dừng";
-  timer = setInterval(() => $("recTime").textContent = ((Date.now() - t0) / 1000).toFixed(1) + " s", 100);
+  rec.start(); t0 = Date.now(); $("recBtn").classList.add("on"); $("recBtn").setAttribute("aria-label", "Dừng ghi âm");
+  tick = setInterval(() => $("recHint").textContent = `Đang ghi ${((Date.now() - t0) / 1000).toFixed(0)} s... bấm để dừng`, 250);
 };
 
-// ---------- analysis ----------
+// ---------- trình phát và dạng sóng ----------
+async function setClip(c, label) {
+  current = c; last = null; levels = null; $("result").innerHTML = "";
+  $("clipName").textContent = label; $("player").hidden = false; $("go").disabled = false;
+  audio.src = URL.createObjectURL(c.blob);
+  peaks = null; drawWave();
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const buf = await ctx.decodeAudioData(await c.blob.arrayBuffer());
+    const data = buf.getChannelData(0), n = 160, step = Math.floor(data.length / n) || 1;
+    peaks = Array.from({length:n}, (_, i) => { let m = 0; for (let j = i * step; j < (i + 1) * step && j < data.length; j++) m = Math.max(m, Math.abs(data[j])); return m; });
+    const mx = Math.max(...peaks, 1e-6); peaks = peaks.map(p => p / mx);
+    ctx.close();
+  } catch { peaks = null; }
+  drawWave();
+}
+
+function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function drawWave() {
+  const cv = $("wave"), dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = 56;
+  cv.width = w * dpr; cv.height = h * dpr;
+  const g = cv.getContext("2d"); g.scale(dpr, dpr); g.clearRect(0, 0, w, h);
+  const n = peaks ? peaks.length : 80, bw = w / n, prog = audio.duration ? audio.currentTime / audio.duration : 0;
+  const col = {HIGH:cssVar("--bad"), MEDIUM:cssVar("--warn"), LOW:cssVar("--ok")};
+  for (let i = 0; i < n; i++) {
+    const p = peaks ? Math.max(0.06, peaks[i]) : 0.12 + 0.08 * Math.sin(i / 2);
+    const lv = levels ? levels[Math.min(levels.length - 1, Math.floor(i / n * levels.length))] : null;
+    g.fillStyle = lv ? col[lv] : (i / n < prog ? cssVar("--wave-played") : cssVar("--wave"));
+    g.globalAlpha = lv && i / n > prog ? 0.55 : 1;
+    const bh = p * (h - 6);
+    g.beginPath(); g.roundRect(i * bw + 1, (h - bh) / 2, Math.max(1, bw - 2), bh, 1.5); g.fill();
+  }
+  g.globalAlpha = 1;
+}
+window.addEventListener("resize", drawWave);
+let stopAt = null;
+audio.ontimeupdate = () => { drawWave(); if (stopAt !== null && audio.currentTime >= stopAt) { audio.pause(); stopAt = null; } };
+audio.onplay = audio.onpause = () => $("playIc").innerHTML = audio.paused ? '<path d="M7 4v16l13-8z"/>' : '<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>';
+$("playBtn").onclick = () => { stopAt = null; audio.paused ? audio.play() : audio.pause(); };
+$("wave").onclick = e => { if (!audio.duration) return; const r = e.target.getBoundingClientRect(); audio.currentTime = (e.clientX - r.left) / r.width * audio.duration; stopAt = null; audio.play(); };
+function playRange(a, b) { audio.currentTime = a; stopAt = b; audio.play(); }
+
+// ---------- phân tích ----------
 async function analyze(ch) {
   const fd = new FormData();
   fd.append("file", current.blob, current.name);
-  fd.append("mode", $("mode").value);
+  fd.append("mode", "window");
   fd.append("channel", ch);
-  fd.append("caller_number", $("caller").value);
   const r = await fetch("/v1/analyze", {method:"POST", body:fd});
   const d = await r.json();
-  if (!r.ok) throw new Error(d.detail || r.statusText);
+  if (!r.ok) throw new Error(typeof d.detail === "string" ? d.detail : "Không phân tích được âm thanh này");
   return d;
 }
+const lvl = (v, p) => v < p.t_high ? "HIGH" : v < p.t_medium ? "MEDIUM" : "LOW";
 
-function truthLine(d) {
-  const s = current.sample;
-  if (!s || !d.risk_level) return "";
-  const flagged = d.risk_level !== "LOW";
-  const ok = (s.label === "spoof") === flagged;
-  return `<p class="truth">Nhãn của mẫu: <b>${s.label === "spoof" ? "giọng giả" : "giọng thật"}</b>${s.detail ? " (" + esc(s.detail) + ")" : ""} ·
-    hệ thống ${flagged ? "cảnh báo" : "cho qua"} · <span class="${ok ? "ok" : "miss"}">${ok ? "đúng" : "sai"}</span></p>`;
-}
-
-function scaleSvg(score, p) {
-  // The axis always shows both thresholds: per-channel thresholds of low-bitrate codecs reach -17.
-  const lo = Math.floor(Math.min(p.t_high - 3, score - 1)), hi = Math.ceil(Math.max(p.t_medium + 5, score + 1));
-  const W = 600, H = 70, x = v => 10 + (v - lo) / (hi - lo) * (W - 20);
-  const zone = (a, b, cls) => `<rect x="${x(a)}" y="18" width="${x(b) - x(a)}" height="14" style="fill:var(--${cls}-bg)"/>`;
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Điểm ${score.toFixed(2)} so với hai ngưỡng">
-    ${zone(lo, p.t_high, "high")}${zone(p.t_high, p.t_medium, "med")}${zone(p.t_medium, hi, "low")}
-    <line x1="${x(p.t_high)}" x2="${x(p.t_high)}" y1="14" y2="36" stroke="var(--high)" stroke-width="1.5"/>
-    <line x1="${x(p.t_medium)}" x2="${x(p.t_medium)}" y1="14" y2="36" stroke="var(--med)" stroke-width="1.5"/>
-    <text x="${x(p.t_high)}" y="49" text-anchor="middle">ngưỡng cao ${p.t_high.toFixed(2)}</text>
-    <text x="${x(p.t_medium)}" y="10" text-anchor="middle">ngưỡng trung bình ${p.t_medium.toFixed(2)}</text>
-    <line x1="${x(score)}" x2="${x(score)}" y1="12" y2="38" stroke="var(--fg)" stroke-width="3"/>
-    <circle cx="${x(score)}" cy="25" r="5" style="fill:var(--fg)"/>
-    <text x="10" y="66">← giống giả</text><text x="${W - 10}" y="66" text-anchor="end">giống thật →</text>
-  </svg>`;
-}
-
-function timelineSvg(segs, p) {
-  if (segs.length < 2) return "";
-  const W = 600, H = 150, L = 40, R = 10, T = 10, B = 26;
-  const t1 = Math.max(...segs.map(s => s.end));
-  const vals = segs.map(s => s.score).concat([p.t_high, p.t_medium]);
-  const lo = Math.min(...vals) - 1, hi = Math.max(...vals) + 1;
-  const x = t => L + t / t1 * (W - L - R), y = v => T + (hi - v) / (hi - lo) * (H - T - B);
-  const lvl = v => v < p.t_high ? "high" : v < p.t_medium ? "med" : "low";
-  const pts = segs.map(s => [x((s.start + s.end) / 2), y(s.score), s]);
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Điểm theo từng cửa sổ 4 giây">
-    <line x1="${L}" x2="${W - R}" y1="${y(p.t_high)}" y2="${y(p.t_high)}" stroke="var(--high)" stroke-dasharray="4 3"/>
-    <line x1="${L}" x2="${W - R}" y1="${y(p.t_medium)}" y2="${y(p.t_medium)}" stroke="var(--med)" stroke-dasharray="4 3"/>
-    <polyline points="${pts.map(q => q[0] + "," + q[1]).join(" ")}" fill="none" stroke="var(--muted)" stroke-width="2"/>
-    ${pts.map(([cx, cy, s]) => `<circle cx="${cx}" cy="${cy}" r="5" style="fill:var(--${lvl(s.score)})" stroke="var(--card)" stroke-width="2">
-      <title>${s.start.toFixed(1)}–${s.end.toFixed(1)} s: điểm ${s.score.toFixed(2)}</title></circle>`).join("")}
-    <line x1="${L}" x2="${W - R}" y1="${H - B}" y2="${H - B}" stroke="var(--line)"/>
-    <text x="${L}" y="${H - 8}">0 s</text><text x="${W - R}" y="${H - 8}" text-anchor="end">${t1.toFixed(1)} s</text>
-    <text x="${L - 6}" y="${y(hi - 1) + 4}" text-anchor="end">${Math.round(hi - 1) || 0}</text>
-    <text x="${L - 6}" y="${y(lo + 1) + 4}" text-anchor="end">${Math.round(lo + 1) || 0}</text>
-  </svg>`;
+// Vị trí trên thang "giả - cần xác minh - thật": mỗi vùng chiếm một phần ba, nội suy trong vùng.
+function gaugePos(s, p) {
+  const span = Math.max(2, p.t_medium - p.t_high);
+  if (s < p.t_high) return Math.max(0.03, (1 - (p.t_high - s) / span) / 3);
+  if (s < p.t_medium) return 1 / 3 + (s - p.t_high) / (p.t_medium - p.t_high) / 3;
+  return Math.min(0.97, 2 / 3 + (s - p.t_medium) / span / 3);
 }
 
 function render(d) {
-  if (d.screened_by === "prefilter") {
-    $("out").innerHTML = `<h3>Kết quả</h3><div class="verdict HIGH"><span class="level">⛔ ${LEVEL.HIGH}</span>
-      <span class="action">${esc(d.recommended_action)}</span></div><p>Số gọi đến nằm trong blacklist, mô hình không được chạy.</p>`;
-    return;
+  last = d;
+  const v = VERDICT[d.risk_level], p = d.policy;
+  // Mức của từng đoạn thời gian: đoạn bị nhiều cửa sổ phủ lấy mức xấu nhất.
+  const dur = d.duration_s, bins = 160, rank = {LOW:0, MEDIUM:1, HIGH:2};
+  levels = Array.from({length:bins}, (_, i) => {
+    const t = (i + 0.5) / bins * dur; let worst = null;
+    for (const s of d.segments) if (t >= s.start && t <= s.end) { const l = lvl(s.score, p); if (!worst || rank[l] > rank[worst]) worst = l; }
+    return worst || "LOW";
+  });
+  drawWave();
+  const worst = d.most_suspicious_segment;
+  const sus = d.segments.filter(s => lvl(s.score, p) !== "LOW").length;
+  const s = current.sample;
+  let truth = "";
+  if (s) {
+    const ok = (s.label === "spoof") === (d.risk_level !== "LOW");
+    truth = `<div class="truth">Đáp án của mẫu thử: <b>${s.label === "spoof" ? "giọng giả" : "giọng thật"}</b>${s.detail ? " (" + esc(s.detail) + ")" : ""}.
+      Hệ thống ${ok ? '<b class="ok">đoán đúng</b>' : '<b class="bad">đoán sai</b>'}.</div>`;
   }
-  const icon = {LOW:"✓", MEDIUM:"!", HIGH:"⛔"}[d.risk_level];
-  const segRows = d.segments.map(s => `<tr><td>${s.start.toFixed(1)}–${s.end.toFixed(1)} s</td><td></td>
-      <td>${s.score.toFixed(3)}</td><td>${s.p_bonafide.toFixed(3)}</td></tr>`).join("");
-  $("out").innerHTML = `<h3>Kết quả trên kênh ${esc(CH[d.channel_simulated]?.name || d.channel_simulated)}</h3>
-    ${d.model_random_weights ? '<p class="warn">Trọng số ngẫu nhiên: kết quả chỉ để kiểm thử giao diện.</p>' : ""}
-    <div class="verdict ${d.risk_level}"><span class="level">${icon} ${LEVEL[d.risk_level]}</span>
-      <span class="action">${esc(d.recommended_action)}${d.escalated_by_prefilter ? " (nâng mức do số gọi đến chưa đăng ký)" : ""}</span></div>
-    ${truthLine(d)}
-    ${scaleSvg(d.score, d.policy)}
-    <div class="facts"><span>Điểm tổng hợp <b>${d.score.toFixed(2)}</b></span><span>Thời lượng <b>${d.duration_s} s</b></span>
-      <span>${d.n_segments} cửa sổ</span><span>Suy luận <b>${d.timing_ms.model} ms</b></span><span>RTF <b>${d.timing_ms.rtf}</b></span></div>
-    ${timelineSvg(d.segments, d.policy)}
-    <details><summary>Điểm từng cửa sổ</summary><table><thead><tr><th>Cửa sổ</th><th></th><th>Điểm</th><th>P(thật)</th></tr></thead>
-      <tbody>${segRows}</tbody></table></details>
-    <p class="note">Ngưỡng: ${esc(d.policy.source)}</p>`;
+  $("result").innerHTML = `
+    <section class="card" aria-live="polite">
+      <div class="verdict ${d.risk_level}">${v.icon}<h2>${v.title}</h2><p>${v.text}</p></div>
+      <div class="gauge" aria-hidden="true">
+        <div class="bar"><div class="dot" style="left:${(100 * gaugePos(d.score, p)).toFixed(1)}%"></div></div>
+        <div class="labels"><span>Giọng giả</span><span>Cần xác minh</span><span>Giọng thật</span></div>
+      </div>
+      <h3>Nên làm gì</h3>
+      <ul class="todo">${v.todo.map(t => `<li>${t}</li>`).join("")}</ul>
+      ${d.segments.length > 1 ? `<h3>Đoạn nào đáng ngờ</h3>
+        <p style="margin:0">${sus ? `${sus}/${d.segments.length} đoạn 4 giây có dấu hiệu bất thường, được tô màu trên dạng sóng ở trên.`
+          : "Không đoạn nào có dấu hiệu bất thường."}
+          ${worst && lvl(worst.score, p) !== "LOW" ? `<button class="linkbtn" id="playWorst">Nghe đoạn đáng ngờ nhất (${worst.start.toFixed(0)}–${worst.end.toFixed(0)} s)</button>` : ""}</p>
+        <div class="legend"><span><i style="background:var(--ok)"></i>Bình thường</span><span><i style="background:var(--warn)"></i>Cần xác minh</span><span><i style="background:var(--bad)"></i>Giống giọng giả</span></div>` : ""}
+      ${truth}
+      <details class="tech"><summary>Chi tiết kỹ thuật</summary>
+        <dl class="kv">
+          <dt>Kênh mô phỏng</dt><dd>${esc(CH_NAME[d.channel_simulated] || d.channel_simulated)}</dd>
+          <dt>Điểm tổng hợp</dt><dd>${d.score.toFixed(2)} (cao hơn là giống thật hơn)</dd>
+          <dt>Ngưỡng</dt><dd>cần xác minh dưới ${p.t_medium.toFixed(2)}, giả dưới ${p.t_high.toFixed(2)}</dd>
+          <dt>Thời lượng</dt><dd>${d.duration_s} s, ${d.n_segments} cửa sổ 4 s</dd>
+          <dt>Thời gian xử lý</dt><dd>${d.timing_ms.model} ms</dd>
+          <dt>Mô hình</dt><dd>${health?.model?.random_weights ? "trọng số ngẫu nhiên (chế độ thử)" : `encoder ${health?.model?.num_layers ?? "?"} lớp`}, ${esc(p.source)}</dd>
+        </dl>
+        <table><thead><tr><th>Đoạn</th><th>Điểm</th><th>Đánh giá</th></tr></thead><tbody>
+          ${d.segments.map(x => `<tr><td>${x.start.toFixed(1)}–${x.end.toFixed(1)} s</td><td>${x.score.toFixed(2)}</td><td><span class="pill ${lvl(x.score, p)}">${LEVEL_WORD[lvl(x.score, p)]}</span></td></tr>`).join("")}
+        </tbody></table>
+        <p style="margin-top:12px"><button class="linkbtn" id="cmp">So sánh kết quả qua các kênh gọi</button></p>
+        <div id="cmpOut"></div>
+      </details>
+      <p class="note">Kết quả hỗ trợ ra quyết định và có thể sai. Luôn xác minh qua một kênh độc lập trước giao dịch quan trọng.</p>
+    </section>`;
+  if ($("playWorst")) $("playWorst").onclick = () => playRange(worst.start, worst.end);
+  $("cmp").onclick = compare;
 }
 
-$("analyze").onclick = async () => {
-  $("analyze").disabled = true;
-  $("out").innerHTML = `<p><span class="spin"></span>Đang phân tích...</p>`;
-  try { render(await analyze(channel)); }
-  catch (e) { $("out").innerHTML = `<p class="warn">Lỗi: ${esc(e.message)}</p>`; }
-  $("analyze").disabled = false;
+$("go").onclick = async () => {
+  const b = $("go"); b.disabled = true; b.innerHTML = `<span class="spin"></span>Đang kiểm tra...`;
+  try { render(await analyze(channel)); $("result").scrollIntoView({behavior:"smooth", block:"start"}); }
+  catch (e) { $("result").innerHTML = `<section class="card"><p class="err">${esc(e.message)}</p></section>`; }
+  b.disabled = false; b.textContent = "Kiểm tra giọng nói";
 };
 
-$("compare").onclick = async () => {
-  $("compare").disabled = true;
-  const chans = COMPARE.filter(c => health?.channel_info?.[c]?.available !== false);
-  const rows = [];
+async function compare() {
+  const out = $("cmpOut"), rows = [];
+  const chans = SOURCES.map(s => s.ch).filter(c => health?.channel_info?.[c]?.available !== false);
   for (const [i, c] of chans.entries()) {
-    $("out").innerHTML = `<p><span class="spin"></span>Đang phân tích kênh ${i + 1}/${chans.length}: ${esc(CH[c].name)}</p>`;
+    out.innerHTML = `<p class="hint" style="text-align:left">Đang kiểm tra kênh ${i + 1}/${chans.length}...</p>`;
     try { rows.push([c, await analyze(c)]); } catch (e) { rows.push([c, {error:e.message}]); }
   }
-  const s = current.sample;
-  $("out").innerHTML = `<h3>Cùng một âm thanh qua các kênh</h3>
-    ${s ? `<p class="truth">Nhãn của mẫu: <b>${s.label === "spoof" ? "giọng giả" : "giọng thật"}</b></p>` : ""}
-    <table><thead><tr><th>Kênh</th><th>Ví dụ</th><th>Điểm</th><th>Mức rủi ro</th>${s ? "<th>Đúng nhãn</th>" : ""}</tr></thead><tbody>
-    ${rows.map(([c, d]) => d.error ? `<tr><td>${esc(CH[c].name)}</td><td>${esc(CH[c].app)}</td><td colspan="${s ? 3 : 2}" class="HIGH">${esc(d.error)}</td></tr>` :
-      `<tr><td>${esc(CH[c].name)}</td><td>${esc(CH[c].app)}</td><td>${d.score?.toFixed(2) ?? "–"}</td>
-       <td class="${d.risk_level}">${LEVEL[d.risk_level]}</td>
-       ${s ? `<td>${(s.label === "spoof") === (d.risk_level !== "LOW") ? '<span class="ok">đúng</span>' : '<span class="miss">sai</span>'}</td>` : ""}</tr>`).join("")}
-    </tbody></table>
-    <p class="note">Mỗi kênh dùng ngưỡng hiệu chỉnh riêng của kênh đó. Codec được mô phỏng trên máy chủ bằng ffmpeg.</p>`;
-  $("compare").disabled = false;
-};
+  out.innerHTML = `<table><thead><tr><th>Nếu đoạn này đi qua</th><th>Kết luận</th></tr></thead><tbody>
+    ${rows.map(([c, d]) => `<tr><td>${SOURCES.find(s => s.ch === c).name}</td><td>${d.error ? esc(d.error) : `<span class="pill ${d.risk_level}">${LEVEL_WORD[d.risk_level]}</span>`}</td></tr>`).join("")}
+  </tbody></table>`;
+}
 </script>
 </body>
 </html>

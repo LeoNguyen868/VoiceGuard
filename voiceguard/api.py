@@ -12,25 +12,32 @@ Environment variables:
   VG_SAMPLES     folder with manifest.json and sample audio for the web interface (default samples/)
   VG_DEVICE      cpu | cuda (default: cuda if available)
   VG_FP16=1      FP16 autocast on GPU
-  VG_REGISTERED  text file of registered customer numbers, one per line (pre-filter)
-  VG_BLACKLIST   text file of blacklisted numbers, one per line (pre-filter)
+  VG_REGISTERED  text file of registered customer numbers, one per line, imported at start-up
+  VG_BLACKLIST   text file of blacklisted numbers, one per line, imported at start-up
+  VG_DB          SQLite file of call history, number lists and feedback (default data/voiceguard.db)
+  VG_WEBHOOK_URL URL that receives a JSON POST when a call reaches HIGH or an agent holds or transfers it
   VG_AUDIT_LOG   JSONL audit log path (default: logs/audit.jsonl). Audio and phone numbers are never stored.
   VG_CUDA_GRAPH=1    replay CUDA Graphs for 4 s windows (GPU only)
   VG_BATCH=0         run each request alone instead of batching windows across requests and calls
   VG_BATCH_MAX       largest batch of windows (default 16)
   VG_BATCH_WAIT_MS   how long the first queued window waits for others (default 10)
 
-Calls can also be streamed: POST /v1/calls opens a call, POST /v1/calls/{id}/audio sends raw
-16 kHz mono 16-bit PCM chunks (a window is scored every 2 s once 4 s are buffered), and
-POST /v1/calls/{id}/end closes it and writes one audit row.
+Calls are streamed by the PBX connector: POST /v1/calls opens a call (caller number, line channel), POST
+/v1/calls/{id}/audio sends raw 16 kHz mono 16-bit PCM chunks (a window is scored every 2 s once 4 s are
+buffered), POST /v1/calls/{id}/end closes it. Every step is stored and published on GET /v1/events
+(server-sent events) for the operator console: agents act on live calls, fraud analysts give verdicts,
+confirmed fraud blacklists the caller.
 
 Run: uvicorn voiceguard.api:app --host 0.0.0.0 --port 8000
 """
+import asyncio
 import hashlib
 import json
 import os
 import tempfile
+import threading
 import time
+import urllib.request
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -39,7 +46,7 @@ import numpy as np
 import torch
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .audio import SR, load_audio, repeat_pad, rms_dbfs
@@ -47,8 +54,9 @@ from .batcher import WindowBatcher
 from .channel import CHANNELS, apply_channel, available_channels
 from .detector import MIN_RMS_DBFS, MIN_SECONDS, Detector, InsufficientAudio
 from .model import build_random_detector, load_detector
-from .policy import at_least_medium, load_policy
-from .prefilter import RULES, classify, load_numbers
+from .policy import LEVELS, at_least_medium, load_policy
+from .prefilter import RULES, load_numbers, normalize
+from .store import LEVEL_RANK, Store
 
 STATIC = Path(__file__).parent / "static"
 ROOT = Path(__file__).resolve().parent.parent
@@ -107,21 +115,73 @@ def _policy_for(channel):
     return _state["channel_policies"].get(channel, _state["detector"].policy)
 
 
-def _lists():
-    if "registered" not in _state:
-        _state["registered"] = load_numbers(os.environ.get("VG_REGISTERED"))
-        _state["blacklist"] = load_numbers(os.environ.get("VG_BLACKLIST"))
-    return _state["registered"], _state["blacklist"]
+def _store():
+    if "store" not in _state:
+        st = Store(os.environ.get("VG_DB", str(ROOT / "data" / "voiceguard.db")))
+        for lst, env in (("registered", "VG_REGISTERED"), ("blacklist", "VG_BLACKLIST")):
+            path = os.environ.get(env)
+            if path:
+                with open(path, encoding="utf-8") as f:
+                    for line in f:
+                        if normalize(line):
+                            st.add_number(line.strip(), lst, source=f"tệp {os.path.basename(path)}")
+        _state["store"] = st
+    return _state["store"]
+
+
+def _classify(number):
+    """Caller category from the stored lists (blacklist wins)."""
+    if number is None or number.strip() == "":
+        return "not_provided"
+    if not normalize(number):
+        return "hidden"
+    lists = _store().lists_of(_store().key(number))
+    return "blacklist" if "blacklist" in lists else "registered" if "registered" in lists else "unknown"
+
+
+class _Bus:
+    """Fan-out of events to every open console (server-sent events)."""
+
+    def __init__(self):
+        self.subs = set()
+
+    def publish(self, event):
+        for q in list(self.subs):
+            if q.qsize() < 1000:
+                q.put_nowait(event)
+
+
+BUS = _Bus()
+
+
+def _webhook(event):
+    url = os.environ.get("VG_WEBHOOK_URL")
+    if not url:
+        return
+
+    def send():
+        try:
+            req = urllib.request.Request(url, data=json.dumps(event).encode(), method="POST",
+                                         headers={"Content-Type": "application/json"})
+            urllib.request.urlopen(req, timeout=3).close()
+        except Exception:
+            pass
+    threading.Thread(target=send, daemon=True).start()
 
 
 @app.on_event("startup")
 def _startup():
     _get()
-    _lists()
+    _store()
 
 
 @app.get("/")
-def index():
+def console():
+    return FileResponse(STATIC / "console.html", headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/check")
+def check_page():
     return FileResponse(STATIC / "index.html", headers={"Cache-Control": "no-cache"})
 
 
@@ -141,13 +201,13 @@ if SAMPLES.is_dir():
 @app.get("/health")
 def health():
     det = _get()
-    registered, blacklist = _lists()
+    counts = _store().count_numbers()
     b = _state["batcher"]
     return dict(status="ok", device=_state["device"], fp16=det.fp16, model=_state["model_info"],
                 policy=det.policy.to_dict(), channels=list(CHANNELS),
                 channel_info={c: dict(description=CHANNELS[c][2], available=available_channels()[c],
                                       calibrated=c in _state["channel_policies"]) for c in CHANNELS},
-                prefilter=dict(registered=len(registered), blacklist=len(blacklist)),
+                prefilter=dict(registered=counts.get("registered", 0), blacklist=counts.get("blacklist", 0)),
                 inference=dict(cuda_graph=det.graphs is not None, batch_max=b.max_batch,
                                batch_wait_ms=b.max_wait * 1000, across_requests=b.max_requests is None,
                                batches=b.stats["batches"], windows=b.stats["windows"], open_calls=len(_state["calls"])))
@@ -164,8 +224,7 @@ async def analyze(file: UploadFile = File(...), mode: str = Form("window"),
         raise HTTPException(422, f"ffmpeg trên máy chủ không có encoder cho kênh {channel}")
     det = _get()
     data = await file.read()
-    registered, blacklist = _lists()
-    category = classify(caller_number, registered, blacklist)
+    category = _classify(caller_number)
     policy = _policy_for(channel)
 
     if category == "blacklist":
@@ -217,35 +276,69 @@ async def analyze(file: UploadFile = File(...), mode: str = Form("window"),
 class _Call:
     """Streaming state of one call. Only the last window of audio is kept in memory."""
 
-    def __init__(self, category):
-        self.category, self.buf, self.offset, self.next_start = category, np.zeros(0, np.float32), 0, 0
+    def __init__(self, call_id, category, channel):
+        self.id, self.category, self.channel = call_id, category, channel
+        self.buf, self.offset, self.next_start = np.zeros(0, np.float32), 0, 0
         self.scores, self.skipped, self.sha = [], 0, hashlib.sha256()
         self.received, self.started = 0, time.time()
+        self.max_level, self.alerted = None, False
 
 
-def _decision(det, call):
+def _decision(call):
     if call.category == "blacklist":
-        return dict(score=None, risk_level="HIGH", recommended_action=RULES["blacklist"], screened_by="prefilter")
+        return dict(score=None, spoof_percent=None, risk_level="HIGH", recommended_action=RULES["blacklist"],
+                    screened_by="prefilter")
     if not call.scores:
-        return dict(score=None, risk_level=None, recommended_action=None, screened_by="model")
+        return dict(score=None, spoof_percent=None, risk_level=None, recommended_action=None, screened_by="model")
+    policy = _policy_for(call.channel)
     score = float(np.mean(call.scores))
-    level, action = det.policy.decide(score)
+    level, action = policy.decide(score)
     escalated = False
     if call.category in ("unknown", "hidden"):
         new_level, action = at_least_medium(level)
         escalated, level = new_level != level, new_level
-    return dict(score=round(score, 4), risk_level=level, recommended_action=action,
-                screened_by="model", escalated_by_prefilter=escalated)
+    return dict(score=round(score, 4), spoof_percent=round(policy.spoof_percent(score)[0], 1), risk_level=level,
+                recommended_action=action, screened_by="model", escalated_by_prefilter=escalated)
+
+
+def _summary(call, dec):
+    return dict(call_id=call.id, audio_s=round(call.received / SR, 2), n_windows=len(call.scores),
+                skipped_silent=call.skipped, max_level=call.max_level, caller_category=call.category,
+                channel=call.channel, **dec)
+
+
+def _after_decision(call, dec):
+    """Store and publish the call's state; alert once when it first reaches HIGH."""
+    level = dec["risk_level"]
+    if LEVEL_RANK[level] > LEVEL_RANK[call.max_level]:
+        call.max_level = level
+    _store().update_call(call.id, n_windows=len(call.scores), score=dec["score"], spoof_percent=dec["spoof_percent"],
+                         risk_level=level, max_level=call.max_level, screened_by=dec["screened_by"],
+                         duration_s=round(call.received / SR, 2))
+    if level == "HIGH" and not call.alerted:
+        call.alerted = True
+        ev = dict(type="alert", call=_store().get_call(call.id))
+        BUS.publish(ev)
+        _webhook(ev)
 
 
 @app.post("/v1/calls")
-async def open_call(caller_number: str = Form("")):
-    det = _get()
-    registered, blacklist = _lists()
+async def open_call(caller_number: str = Form(""), channel: str = Form("none"), agent: str = Form(""),
+                    recording_ref: str = Form("")):
+    """Open a call. channel is the line's codec (the audio arrives already through it), so it selects
+    the channel's thresholds; it is not simulated."""
+    _get()
+    if channel not in CHANNELS:
+        raise HTTPException(422, f"channel phải thuộc {list(CHANNELS)}")
     call_id = uuid.uuid4().hex
-    call = _Call(classify(caller_number, registered, blacklist))
+    call = _Call(call_id, _classify(caller_number), channel)
     _state["calls"][call_id] = call
-    return dict(call_id=call_id, caller_category=call.category, **_decision(det, call))
+    _store().start_call(call_id, caller_number, call.category, channel, agent, recording_ref)
+    dec = _decision(call)
+    if call.category == "blacklist":
+        _after_decision(call, dec)
+    BUS.publish(dict(type="call_started", call=dict(_store().get_call(call_id), policy=_policy_for(channel).to_dict())))
+    return _summary(call, dec)
 
 
 @app.post("/v1/calls/{call_id}/audio")
@@ -280,12 +373,17 @@ async def call_audio(call_id: str, request: Request):
             t0 = time.perf_counter()
             rows = await _state["batcher"].submit(clips)
             ms = (time.perf_counter() - t0) * 1000
+            policy = _policy_for(call.channel)
             for st, row in zip(starts, rows):
                 call.scores.append(float(row[1]))
-                new.append(dict(start=round(st / SR, 2), end=round((st + win) / SR, 2), score=round(float(row[1]), 4)))
-            new[-1]["latency_ms"] = round(ms, 1)
-    return dict(call_id=call_id, audio_s=round(call.received / SR, 2), new_windows=new,
-                n_windows=len(call.scores), skipped_silent=call.skipped, **_decision(det, call))
+                new.append(dict(start=round(st / SR, 2), end=round((st + win) / SR, 2), score=round(float(row[1]), 4),
+                                level=policy.decide(float(row[1]))[0], latency_ms=round(ms, 1)))
+            _store().add_windows(call.id, new)
+    dec = _decision(call)
+    if new:
+        _after_decision(call, dec)
+        BUS.publish(dict(type="call_update", windows=new, **_summary(call, dec)))
+    return dict(new_windows=new, **_summary(call, dec))
 
 
 @app.post("/v1/calls/{call_id}/end")
@@ -299,12 +397,137 @@ async def end_call(call_id: str):
         tail = call.buf if len(call.buf) else np.zeros(1, np.float32)
         if rms_dbfs(tail) >= MIN_RMS_DBFS:
             call.scores.append(float((await _state["batcher"].submit([repeat_pad(tail, det.win)]))[0][1]))
+    dec = _decision(call)
+    if dec["risk_level"]:
+        _after_decision(call, dec)
+    _store().update_call(call.id, status="ended", ended_at=time.time(), duration_s=round(call.received / SR, 2))
     result = dict(request_id=call_id, duration_s=round(call.received / SR, 2), mode="stream",
                   n_segments=len(call.scores), skipped_silent=call.skipped, caller_category=call.category,
-                  channel_simulated="none", timing_ms=dict(wall_s=round(time.time() - call.started, 2)),
-                  **_decision(det, call))
+                  channel_simulated=call.channel, timing_ms=dict(wall_s=round(time.time() - call.started, 2)), **dec)
     _audit(result, call.sha.hexdigest(), None)
+    BUS.publish(dict(type="call_ended", call=_store().get_call(call_id)))
     return result
+
+
+# ---------------------------------------------------------------- console API
+
+@app.get("/v1/events")
+async def events(request: Request):
+    """Server-sent events: call_started, call_update, alert, call_ended, action, verdict, numbers."""
+    q = asyncio.Queue()
+    BUS.subs.add(q)
+
+    async def stream():
+        try:
+            yield "retry: 2000\n\n"
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    ev = await asyncio.wait_for(q.get(), timeout=15)
+                    yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": ping\n\n"
+        finally:
+            BUS.subs.discard(q)
+    return StreamingResponse(stream(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/v1/calls")
+def list_calls(status: str = None, min_level: str = None, unreviewed: bool = False, limit: int = 100,
+               hours: float = None):
+    if min_level and min_level not in LEVELS:
+        raise HTTPException(422, "min_level phải là LOW, MEDIUM hoặc HIGH")
+    since = time.time() - hours * 3600 if hours else None
+    return _store().list_calls(status, min_level, unreviewed, limit, since)
+
+
+@app.get("/v1/calls/{call_id}")
+def get_call(call_id: str):
+    c = _store().get_call(call_id)
+    if c is None:
+        raise HTTPException(404, "không tìm thấy cuộc gọi")
+    c["policy"] = _policy_for(c["channel"] or "none").to_dict()
+    return c
+
+
+ACTIONS = {"continue": "Tiếp tục sau khi xác minh", "verify": "Đang xác minh bổ sung",
+           "hold": "Tạm giữ giao dịch", "transfer": "Chuyển bộ phận chống gian lận"}
+
+
+@app.post("/v1/calls/{call_id}/action")
+def call_action(call_id: str, action: str = Form(...), agent: str = Form("")):
+    """An agent's action on a call; hold and transfer are sent to the webhook (CRM, core banking)."""
+    if action not in ACTIONS:
+        raise HTTPException(422, f"action phải thuộc {list(ACTIONS)}")
+    if _store().get_call(call_id) is None:
+        raise HTTPException(404, "không tìm thấy cuộc gọi")
+    _store().update_call(call_id, action=action, action_at=time.time(), **({"agent": agent} if agent else {}))
+    ev = dict(type="action", call=_store().get_call(call_id))
+    BUS.publish(ev)
+    if action in ("hold", "transfer"):
+        _webhook(ev)
+    return ev["call"]
+
+
+@app.post("/v1/calls/{call_id}/verdict")
+def call_verdict(call_id: str, verdict: str = Form(...), note: str = Form(""), analyst: str = Form("")):
+    """Fraud analyst's conclusion. Confirmed fraud blacklists the caller (when the number was given)."""
+    if verdict not in ("fraud", "genuine"):
+        raise HTTPException(422, "verdict phải là 'fraud' hoặc 'genuine'")
+    if _store().get_call(call_id) is None:
+        raise HTTPException(404, "không tìm thấy cuộc gọi")
+    _store().update_call(call_id, verdict=verdict, verdict_note=note, verdict_by=analyst, verdict_at=time.time())
+    key, masked = _store().caller_key_of(call_id)
+    if verdict == "fraud" and key:
+        _store().add_number(key=key, masked=masked, lst="blacklist", source=f"xác nhận gian lận, cuộc gọi {call_id[:8]}",
+                            note=note)
+        BUS.publish(dict(type="numbers"))
+    ev = dict(type="verdict", call=_store().get_call(call_id))
+    BUS.publish(ev)
+    return ev["call"]
+
+
+@app.get("/v1/numbers")
+def list_numbers(list: str = "blacklist"):
+    if list == "suggested":
+        return _store().suggestions()
+    if list not in ("blacklist", "registered"):
+        raise HTTPException(422, "list phải là blacklist, registered hoặc suggested")
+    return _store().numbers(list)
+
+
+@app.post("/v1/numbers")
+def add_number(number: str = Form(""), list: str = Form("blacklist"), note: str = Form(""), key: str = Form("")):
+    """Add a number by its digits, or a suggested caller by its key."""
+    if list not in ("blacklist", "registered"):
+        raise HTTPException(422, "list phải là blacklist hoặc registered")
+    try:
+        if key:
+            masked = next((s["masked"] for s in _store().suggestions(min_high=1) if s["key"] == key), "số đã che")
+            _store().add_number(key=key, masked=masked, lst=list, source="duyệt đề xuất", note=note)
+        else:
+            _store().add_number(number, list, source="nhập tay", note=note)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    BUS.publish(dict(type="numbers"))
+    return dict(ok=True)
+
+
+@app.delete("/v1/numbers/{key}")
+def remove_number(key: str, list: str = "blacklist"):
+    if not _store().remove_number(key, list):
+        raise HTTPException(404, "không có số này trong danh sách")
+    BUS.publish(dict(type="numbers"))
+    return dict(ok=True)
+
+
+@app.get("/v1/stats")
+def stats(hours: float = 24):
+    out = _store().stats(time.time() - hours * 3600)
+    out["open_calls"] = len(_state.get("calls", {}))
+    out["hours"] = hours
+    return out
 
 
 def _audit(result, sha256, filename):

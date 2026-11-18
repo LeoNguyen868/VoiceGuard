@@ -89,13 +89,14 @@ def available_channels():
     if _AVAILABLE is None:
         t = np.arange(SR, dtype=np.float32) / SR
         tone = (0.3 * np.sin(2 * np.pi * 440 * t)).astype(np.float32)
-        _AVAILABLE = {}
+        found = {}
         for name in CHANNELS:
             try:
                 apply_channel(tone, name)
-                _AVAILABLE[name] = True
+                found[name] = True
             except (subprocess.CalledProcessError, FileNotFoundError):
-                _AVAILABLE[name] = False
+                found[name] = False
+        _AVAILABLE = found                                                    # published only when complete
     return _AVAILABLE
 
 

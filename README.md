@@ -42,6 +42,20 @@ python -m voiceguard.convert assemble --base weights/nes2netx_itw_vg.pt --head w
     --dst weights/voiceguard_L14.pt
 ```
 
+## Hệ thống cho tổng đài
+
+| Đối tượng | Màn hình (`http://<máy chủ>:8000/`) |
+|---|---|
+| Nhân viên tổng đài | **Cuộc gọi trực tiếp:** mức rủi ro và khả năng giả của từng cuộc gọi, cập nhật mỗi 2 giây; cuộc gọi rủi ro cao lên đầu, có âm báo; nút xác minh, tạm giữ giao dịch, chuyển chống gian lận |
+| Chuyên viên chống gian lận | **Hàng đợi điều tra:** cuộc gọi cần xác minh hoặc rủi ro cao đã kết thúc; kết luận gian lận (tự đưa số vào blacklist) hoặc khách thật<br>**Danh sách số:** blacklist, số đã đăng ký, số được đề xuất chặn (gọi tới nhiều lần ở mức rủi ro cao) |
+| Giám sát | **Tổng quan:** số cuộc gọi, cảnh báo, chặn, gian lận đã xác nhận, tỷ lệ cảnh báo nhầm, độ trễ |
+| Mọi người | **Kiểm tra tệp** (`/check`): tải lên tin nhắn thoại hoặc bản ghi để kiểm tra |
+
+- **Luồng:** tổng đài mở phiên cho mỗi cuộc gọi (`POST /v1/calls` với số gọi đến và kênh của đường dây), gửi âm thanh PCM 16 kHz theo từng đoạn và đóng phiên khi cúp máy. Mọi bước được lưu vào SQLite (`VG_DB`) và đẩy tới các màn hình qua `GET /v1/events` (server-sent events).
+- **Dữ liệu cá nhân:** số điện thoại chỉ được lưu dưới dạng mã băm có salt và dạng đã che; âm thanh không được lưu, cuộc gọi chỉ giữ mã bản ghi âm của tổng đài.
+- **Webhook:** `VG_WEBHOOK_URL` nhận JSON khi một cuộc gọi lên mức rủi ro cao hoặc khi nhân viên tạm giữ, chuyển cuộc gọi (để CRM hoặc core banking giữ giao dịch).
+- **Mô phỏng tổng đài:** `python -m voiceguard.simulate --url http://localhost:8000 --calls 20` mở 20 cuộc gọi đồng thời, phát âm thanh của thư viện mẫu qua codec của từng đường dây với tốc độ thật.
+
 ## Chạy dịch vụ
 
 ```bash

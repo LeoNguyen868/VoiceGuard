@@ -79,11 +79,13 @@ class Detector:
         score = float(np.mean(scores))
         policy = policy or self.policy
         level, action = policy.decide(score)
+        pct, method = policy.spoof_percent(score)
         worst = int(np.argmin(scores))
         return dict(
             duration_s=round(len(wav) / SR, 2), mode=mode, n_segments=len(segments),
             score=round(score, 4), p_bonafide=round(float(np.mean(p_bona)), 4),
             risk_level=level, recommended_action=action,
+            spoof_percent=round(pct, 1), spoof_percent_method=method,
             most_suspicious_segment=segments[worst], segments=segments,
             policy=policy.to_dict(),
             timing_ms=dict(model=round(model_ms, 1),

@@ -6,7 +6,8 @@ data. They are dataset- and channel-specific: a threshold calibrated on clean
 In-the-Wild audio is not valid for G.711 calls without re-calibration.
 """
 import json
-from dataclasses import asdict, dataclass
+import math
+from dataclasses import asdict, dataclass, field
 
 LEVELS = {
     "LOW": "Tiếp tục quy trình bình thường",
@@ -21,6 +22,9 @@ class Policy:
     t_medium: float  # t_high <= score < t_medium -> MEDIUM (FRR 7%: extra verification budget)
     calibrated: bool = False
     source: str = "mặc định, chưa hiệu chỉnh"
+    # Platt scaling P(spoof | score) = 1 / (1 + exp(a * score + b)), fitted per channel with equal priors
+    # (python -m voiceguard.calibrate). Empty: the percentage is estimated from the two thresholds.
+    platt: dict = field(default_factory=dict)
 
     def decide(self, score):
         if score < self.t_high:
@@ -30,6 +34,21 @@ class Policy:
         else:
             level = "LOW"
         return level, LEVELS[level]
+
+    def spoof_percent(self, score):
+        """(Percentage that the audio is spoofed, method). Calibrated when Platt parameters are known;
+        otherwise a piecewise estimate anchored at the thresholds: t_medium -> 50%, t_high -> 90%."""
+        if self.platt:
+            z = self.platt["a"] * score + self.platt["b"]
+            return 100.0 / (1.0 + math.exp(max(-60.0, min(60.0, z)))), "platt"
+        span = max(self.t_medium - self.t_high, 1e-6)
+        if score >= self.t_medium:
+            p = 50.0 - 40.0 * (score - self.t_medium) / span      # one span above t_medium -> 10%
+        elif score >= self.t_high:
+            p = 50.0 + 40.0 * (self.t_medium - score) / span      # t_high -> 90%
+        else:
+            p = 90.0 + 9.0 * min(1.0, (self.t_high - score) / span)
+        return max(1.0, min(99.0, p)), "thresholds"
 
     def to_dict(self):
         return asdict(self)
@@ -48,4 +67,4 @@ def load_policy(path=None):
     with open(path, encoding="utf-8") as f:
         cal = json.load(f)
     return Policy(t_high=cal["t_high"], t_medium=cal["t_medium"], calibrated=True,
-                  source=cal.get("source", path))
+                  source=cal.get("source", path), platt=cal.get("platt") or {})

@@ -79,6 +79,15 @@
   .verdict svg { grid-row:span 2; }
   .verdict h2 { margin:0; font-size:26px; line-height:1.2; letter-spacing:-.01em; }
   .verdict p { margin:0; color:var(--fg); }
+  .verdict .pct { grid-row:span 2; font-size:44px; font-weight:800; line-height:1; letter-spacing:-.02em; text-align:right; }
+  .verdict .pct small { display:block; font-size:13px; font-weight:600; letter-spacing:0; opacity:.85; }
+  .verdict.has-pct { grid-template-columns:auto 1fr auto; }
+  @media (max-width:520px) {
+    .verdict.has-pct { grid-template-columns:auto 1fr; }
+    .verdict .pct { grid-row:auto; grid-column:1 / -1; text-align:left; order:3; margin-top:8px; }
+    .verdict h2 { font-size:22px; }
+    .seg button svg { display:none; }
+  }
   .gauge { margin:4px 0 18px; }
   .gauge .bar { position:relative; height:10px; border-radius:99px; background:linear-gradient(90deg, var(--bad) 0%, var(--warn) 50%, var(--ok) 100%); opacity:.85; }
   .gauge .dot { position:absolute; top:50%; width:20px; height:20px; border-radius:50%; background:var(--card); border:4px solid var(--fg); transform:translate(-50%,-50%); }
@@ -170,17 +179,17 @@ const SOURCES = [
   {ch:"gsm",    name:"Di động 2G",          sub:"Sóng yếu, mạng cũ",                icon:"M2 20h2m3 0V16m4 4v-8m4 8V9m4 11V5"},
 ];
 const VERDICT = {
-  LOW:    {title:"Có vẻ là giọng người thật", text:"Không thấy dấu hiệu rõ ràng của giọng nhân bản.",
+  LOW:    {title:"Giọng thật", text:"Không thấy dấu hiệu rõ ràng của giọng nhân bản.",
            todo:["Tiếp tục bình thường.", "Với giao dịch lớn, vẫn nên xác minh qua một kênh khác."],
            icon:'<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg>'},
-  MEDIUM: {title:"Cần xác minh thêm", text:"Một số đoạn có dấu hiệu bất thường, chưa đủ để kết luận.",
+  MEDIUM: {title:"Chưa chắc chắn", text:"Một số đoạn có dấu hiệu bất thường, cần xác minh thêm.",
            todo:["Gọi lại vào số điện thoại đã đăng ký của người này.", "Hỏi một thông tin chỉ người thật mới biết.", "Chưa chuyển tiền hay cung cấp mã OTP cho tới khi xác minh xong."],
            icon:'<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4m0 3h.01"/></svg>'},
-  HIGH:   {title:"Nhiều khả năng là giọng giả", text:"Giọng nói có đặc điểm của giọng do AI tạo ra.",
+  HIGH:   {title:"Giọng giả", text:"Giọng nói có đặc điểm của giọng do AI tạo ra.",
            todo:["Không chuyển tiền, không cung cấp mã OTP hay mật khẩu.", "Dừng giao dịch và báo bộ phận chống gian lận.", "Liên hệ người này qua kênh khác để xác nhận."],
            icon:'<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2h8l6 6v8l-6 6H8l-6-6V8l6-6Z"/><path d="m9 9 6 6m0-6-6 6"/></svg>'},
 };
-const LEVEL_WORD = {LOW:"Thật", MEDIUM:"Cần xác minh", HIGH:"Giả"};
+const LEVEL_WORD = {LOW:"Thật", MEDIUM:"Chưa chắc chắn", HIGH:"Giả"};
 const CH_NAME = {none:"Tệp ghi âm", nb8k:"Băng hẹp 8 kHz", g711u:"Tổng đài (G.711)", g711a:"G.711 A-law", gsm:"Di động 2G (GSM)",
   amrnb:"Di động 3G, 4G (AMR-NB)", amrwb:"VoLTE (AMR-WB)", g722:"Tổng đài IP (G.722)", opus12:"Zalo, Messenger (Opus)", mp3_32:"Tin nhắn thoại (MP3)"};
 const $ = id => document.getElementById(id);
@@ -318,17 +327,11 @@ async function analyze(ch) {
 }
 const lvl = (v, p) => v < p.t_high ? "HIGH" : v < p.t_medium ? "MEDIUM" : "LOW";
 
-// Vị trí trên thang "giả - cần xác minh - thật": mỗi vùng chiếm một phần ba, nội suy trong vùng.
-function gaugePos(s, p) {
-  const span = Math.max(2, p.t_medium - p.t_high);
-  if (s < p.t_high) return Math.max(0.03, (1 - (p.t_high - s) / span) / 3);
-  if (s < p.t_medium) return 1 / 3 + (s - p.t_high) / (p.t_medium - p.t_high) / 3;
-  return Math.min(0.97, 2 / 3 + (s - p.t_medium) / span / 3);
-}
-
 function render(d) {
   last = d;
-  const v = VERDICT[d.risk_level], p = d.policy;
+  const v = VERDICT[d.risk_level], p = d.policy, fake = d.spoof_percent;
+  const pctText = d.risk_level === "LOW" ? `${Math.round(100 - fake)}%<small>khả năng thật</small>`
+                                         : `${Math.round(fake)}%<small>khả năng giả</small>`;
   // Mức của từng đoạn thời gian: đoạn bị nhiều cửa sổ phủ lấy mức xấu nhất.
   const dur = d.duration_s, bins = 160, rank = {LOW:0, MEDIUM:1, HIGH:2};
   levels = Array.from({length:bins}, (_, i) => {
@@ -348,10 +351,10 @@ function render(d) {
   }
   $("result").innerHTML = `
     <section class="card" aria-live="polite">
-      <div class="verdict ${d.risk_level}">${v.icon}<h2>${v.title}</h2><p>${v.text}</p></div>
+      <div class="verdict has-pct ${d.risk_level}">${v.icon}<h2>${v.title}</h2><div class="pct">${pctText}</div><p>${v.text}</p></div>
       <div class="gauge" aria-hidden="true">
-        <div class="bar"><div class="dot" style="left:${(100 * gaugePos(d.score, p)).toFixed(1)}%"></div></div>
-        <div class="labels"><span>Giọng giả</span><span>Cần xác minh</span><span>Giọng thật</span></div>
+        <div class="bar"><div class="dot" style="left:${Math.min(97, Math.max(3, 100 - fake)).toFixed(1)}%"></div></div>
+        <div class="labels"><span>Giả 100%</span><span>50%</span><span>Thật 100%</span></div>
       </div>
       <h3>Nên làm gì</h3>
       <ul class="todo">${v.todo.map(t => `<li>${t}</li>`).join("")}</ul>
@@ -359,11 +362,12 @@ function render(d) {
         <p style="margin:0">${sus ? `${sus}/${d.segments.length} đoạn 4 giây có dấu hiệu bất thường, được tô màu trên dạng sóng ở trên.`
           : "Không đoạn nào có dấu hiệu bất thường."}
           ${worst && lvl(worst.score, p) !== "LOW" ? `<button class="linkbtn" id="playWorst">Nghe đoạn đáng ngờ nhất (${worst.start.toFixed(0)}–${worst.end.toFixed(0)} s)</button>` : ""}</p>
-        <div class="legend"><span><i style="background:var(--ok)"></i>Bình thường</span><span><i style="background:var(--warn)"></i>Cần xác minh</span><span><i style="background:var(--bad)"></i>Giống giọng giả</span></div>` : ""}
+        <div class="legend"><span><i style="background:var(--ok)"></i>Bình thường</span><span><i style="background:var(--warn)"></i>Chưa chắc chắn</span><span><i style="background:var(--bad)"></i>Giống giọng giả</span></div>` : ""}
       ${truth}
       <details class="tech"><summary>Chi tiết kỹ thuật</summary>
         <dl class="kv">
           <dt>Kênh mô phỏng</dt><dd>${esc(CH_NAME[d.channel_simulated] || d.channel_simulated)}</dd>
+          <dt>Phần trăm</dt><dd>${d.spoof_percent_method === "platt" ? "xác suất hiệu chỉnh trên In-the-Wild cho kênh này, giả định khả năng thật và giả ban đầu ngang nhau" : "ước lượng theo hai ngưỡng (ngưỡng trung bình ứng với 50%, ngưỡng cao với 90%), chưa hiệu chỉnh xác suất"}</dd>
           <dt>Điểm tổng hợp</dt><dd>${d.score.toFixed(2)} (cao hơn là giống thật hơn)</dd>
           <dt>Ngưỡng</dt><dd>cần xác minh dưới ${p.t_medium.toFixed(2)}, giả dưới ${p.t_high.toFixed(2)}</dd>
           <dt>Thời lượng</dt><dd>${d.duration_s} s, ${d.n_segments} cửa sổ 4 s</dd>
@@ -397,7 +401,7 @@ async function compare() {
     try { rows.push([c, await analyze(c)]); } catch (e) { rows.push([c, {error:e.message}]); }
   }
   out.innerHTML = `<table><thead><tr><th>Nếu đoạn này đi qua</th><th>Kết luận</th></tr></thead><tbody>
-    ${rows.map(([c, d]) => `<tr><td>${SOURCES.find(s => s.ch === c).name}</td><td>${d.error ? esc(d.error) : `<span class="pill ${d.risk_level}">${LEVEL_WORD[d.risk_level]}</span>`}</td></tr>`).join("")}
+    ${rows.map(([c, d]) => `<tr><td>${SOURCES.find(s => s.ch === c).name}</td><td>${d.error ? esc(d.error) : `<span class="pill ${d.risk_level}">${LEVEL_WORD[d.risk_level]}</span> ${Math.round(d.spoof_percent)}% giả`}</td></tr>`).join("")}
   </tbody></table>`;
 }
 </script>

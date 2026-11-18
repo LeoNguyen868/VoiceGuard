@@ -1,0 +1,43 @@
+% System overview, shared by the user guide and the API reference.
+\begin{tikzpicture}[
+  font=\small, >={Stealth[length=2.4mm]},
+  part/.style={draw=navy!45,rounded corners=2pt,fill=soft,align=center,inner sep=4pt,text width=4.4cm,minimum height=11mm},
+  ext/.style={draw=black!35,rounded corners=2pt,fill=black!3,align=center,inner sep=5pt,text width=3.8cm,minimum height=14mm},
+  sink/.style={draw=navy!70,line width=0.7pt,rounded corners=2pt,fill=white,align=center,inner sep=5pt,text width=3.8cm,minimum height=14mm},
+  flow/.style={->,line width=0.8pt,draw=navy},
+  side/.style={->,line width=0.7pt,draw=black!55},
+  lab/.style={font=\scriptsize,text=muted,align=center,fill=white,inner sep=1.5pt}]
+
+  % VoiceGuard pipeline (middle column)
+  \node[part] (api) at (0,0) {\textbf{API dịch vụ}\\{\scriptsize mở phiên, nhận âm thanh, đóng phiên}};
+  \node[part, below=4mm of api] (pre) {\textbf{Lớp lọc số}\\{\scriptsize danh sách đen, số đã định danh, số lạ}};
+  \node[part, below=4mm of pre] (win) {\textbf{Cắt và gom cửa sổ}\\{\scriptsize cửa sổ 4 s, bước 2 s, gom lô các cuộc gọi}};
+  \node[part, below=4mm of win] (model) {\textbf{Mô hình CNN-Transformer}\\{\scriptsize encoder 14 lớp, classifier}};
+  \node[part, below=4mm of model] (pol) {\textbf{Chính sách theo kênh}\\{\scriptsize ngưỡng, tỷ lệ giả mạo, mức cảnh báo}};
+  \foreach \a/\b in {api/pre,pre/win,win/model,model/pol} \draw[flow] (\a) -- (\b);
+  \begin{scope}[on background layer]
+    \node[draw=navy,line width=1pt,rounded corners=3pt,fill=white,fit=(api)(pol),inner sep=8pt,
+          label={[font=\bfseries,text=navy]above:VoiceGuard}] (vg) {};
+  \end{scope}
+
+  % Callers and lines (left column)
+  \node[ext, left=26mm of api] (caller) {\textbf{Người gọi}\\{\scriptsize khách hàng, hoặc kẻ gian dùng giọng nhân bản}};
+  \node[ext, below=9mm of caller] (lines) {\textbf{Kênh thoại}\\{\scriptsize Zalo, Messenger (Opus); di động (GSM, AMR-NB); VoLTE (AMR-WB); cố định (G.711)}};
+  \node[ext, below=9mm of lines] (pbx) {\textbf{Tổng đài doanh nghiệp}\\{\scriptsize PBX / IPCC và bộ kết nối}};
+  \draw[flow] (caller) -- (lines);
+  \draw[flow] (lines) -- (pbx);
+  \draw[flow] (pbx.east) -- ++(9mm,0) |- (api.west) node[lab,pos=0.25,rotate=90,above=1mm]{PCM 16 kHz};
+
+  % Consumers (right column)
+  \node[sink, right=26mm of api] (console) {\textbf{Bảng điều khiển web}\\{\scriptsize theo dõi, xác minh, danh sách số, báo cáo}};
+  \node[sink, below=9mm of console] (staff) {\textbf{Nhân viên, chuyên viên}\\{\scriptsize thao tác và kết luận xác minh}};
+  \node[ext, below=9mm of staff] (crm) {\textbf{CRM, core banking}\\{\scriptsize tạm giữ giao dịch}};
+  \draw[flow] (api.east) -- node[lab,above=1mm]{sự kiện SSE} (console.west);
+  \draw[flow] (console) -- (staff);
+  \draw[side] (staff.west) -- node[lab,above=1mm]{thao tác, kết luận} (vg.east |- staff.west);
+  \draw[side] (vg.east |- crm.west) -- node[lab,above=1mm]{webhook} (crm.west);
+
+  % Storage (below)
+  \node[ext, text width=10cm, minimum height=10mm, below=9mm of vg] (db) {\textbf{Lưu trữ:} \scriptsize SQLite (cuộc gọi, điểm từng cửa sổ, danh sách số, tài khoản); ghi âm WAV của cuộc gọi bị gắn cờ; nhật ký kiểm toán};
+  \draw[flow] (vg) -- (db);
+\end{tikzpicture}

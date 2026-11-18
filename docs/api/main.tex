@@ -1,0 +1,433 @@
+\documentclass[11pt]{article}
+\input{../common/preamble}
+\hypersetup{pdftitle={VoiceGuard - API tích hợp}}
+\newcommand{\method}[2]{\par\smallskip\noindent{\colorbox{#1!12}{\textbf{\texttt{\color{#1!70!black}#2}}}}\ }
+\newcommand{\GET}[1]{\method{green}{GET}\texttt{\bfseries #1}\par}
+\newcommand{\POST}[1]{\method{navy}{POST}\texttt{\bfseries #1}\par}
+\newcommand{\DELETE}[1]{\method{red}{DELETE}\texttt{\bfseries #1}\par}
+\newcommand{\who}[1]{{\small\color{muted}Xác thực: #1}\par}
+\newenvironment{params}{\par\small\tabularx{\linewidth}{@{}>{\ttfamily}l>{\raggedright\arraybackslash}p{2.3cm}X@{}}\toprule
+  \normalfont\textbf{Tham số} & \textbf{Kiểu} & \textbf{Mô tả} \\\midrule}{\bottomrule\endtabularx\par}
+
+\begin{document}
+\vgtitle{API tích hợp}{Kết nối tổng đài, phân tích tệp âm thanh, sự kiện thời gian thực và webhook}{Phiên bản 1.0 · Tháng 11/2026}
+
+\tableofcontents
+\clearpage
+
+% =====================================================================
+\section{Tổng quan}
+
+VoiceGuard cung cấp một dịch vụ HTTP cho ba nhóm bên tích hợp:
+\begin{itemize}
+  \item \textbf{tổng đài doanh nghiệp} (PBX, IPCC) mở phiên cho từng cuộc gọi và gửi âm thanh theo thời gian thực;
+  \item \textbf{hệ thống nghiệp vụ} gửi tệp âm thanh để phân tích, ví dụ tin nhắn thoại hoặc bản ghi âm khách hàng gửi tới;
+  \item \textbf{CRM, core banking} nhận webhook khi cuộc gọi lên mức rủi ro cao hoặc khi nhân viên tạm giữ giao dịch.
+\end{itemize}
+Bảng điều khiển web dùng chính các API này; tài liệu \emph{Hướng dẫn sử dụng giao diện} trình bày các màn hình.
+
+\begin{figure}[tbp]
+  \centering
+  \resizebox{\linewidth}{!}{\input{../common/architecture}}
+  \caption{Kiến trúc tổng quan và vị trí của các bên tích hợp.}
+  \label{fig:arch}
+\end{figure}
+
+\subsection{Quy ước chung}
+
+\begin{itemize}
+  \item Địa chỉ gốc: \ep{http://<máy chủ>:8000}; mọi đường dẫn trong tài liệu tính từ địa chỉ này.
+  \item Tham số của yêu cầu \texttt{POST} được gửi dạng form (\texttt{application/x-www-form-urlencoded} hoặc \texttt{multipart/form-data}); âm thanh cuộc gọi được gửi dạng nhị phân (\texttt{application/octet-stream}).
+  \item Phản hồi là JSON UTF-8. Thời điểm là Unix time tính bằng giây (số thực).
+  \item Số điện thoại không bao giờ được trả về nguyên dạng: phản hồi chỉ chứa dạng đã che (\texttt{0912***678}) và mã băm có salt (\texttt{key}).
+\end{itemize}
+
+\subsection{Mức cảnh báo và điểm}
+
+Mô hình chấm từng cửa sổ 4 giây, bước trượt 2 giây. \key{score} là logit của lớp giọng thật: điểm càng cao thì càng giống giọng thật. Mỗi kênh thoại có hai ngưỡng hiệu chỉnh riêng \key{t\_high} < \key{t\_medium}; điểm của cuộc gọi là trung bình điểm các cửa sổ đã chấm.
+
+\begin{table}[tbp]
+  \centering\small
+  \caption{Quy tắc gán mức cảnh báo.}
+  \label{tab:levels}
+  \begin{tabularx}{\linewidth}{@{}>{\ttfamily}lX@{}}
+    \toprule
+    \normalfont\textbf{risk\_level} & \textbf{Điều kiện} \\
+    \midrule
+    LOW & \key{score} $\geq$ \key{t\_medium}, và số gọi đến là số đã định danh \\
+    MEDIUM & \key{t\_high} $\leq$ \key{score} < \key{t\_medium}; hoặc số lạ, số ẩn có \key{score} $\geq$ \key{t\_medium} (\key{escalated\_by\_prefilter} = \texttt{true}) \\
+    HIGH & \key{score} < \key{t\_high}; hoặc số trong danh sách đen (\key{screened\_by} = \texttt{prefilter}, mô hình không chạy) \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\key{spoof\_percent} là xác suất giọng nhân bản (0--100), quy đổi từ điểm bằng hiệu chỉnh Platt của kênh.
+
+\subsection{Kênh thoại}
+
+Tham số \key{channel} chọn ngưỡng của kênh. Với luồng cuộc gọi, âm thanh đã đi qua codec của đường dây nên \key{channel} chỉ chọn ngưỡng; với \ep{/v1/analyze}, dịch vụ mô phỏng codec của kênh trước khi chấm.
+
+\begin{table}[tbp]
+  \centering\small
+  \caption{Giá trị của tham số \texttt{channel}.}
+  \label{tab:channels}
+  \begin{tabular}{@{}>{\ttfamily}ll@{}}
+    \toprule
+    \normalfont\textbf{channel} & \textbf{Kênh} \\
+    \midrule
+    none & Âm thanh gốc 16 kHz \\
+    opus12 & Opus 12 kbit/s: Zalo, Messenger \\
+    amrnb & AMR-NB 12{,}2 kbit/s: di động 3G, 4G \\
+    amrwb & AMR-WB 12{,}65 kbit/s: VoLTE \\
+    gsm & GSM 06.10: di động 2G \\
+    g711u, g711a & G.711 $\mu$-law, A-law: cố định PSTN \\
+    g722 & G.722: tổng đài IP băng rộng \\
+    nb8k & Băng hẹp 8 kHz, không nén \\
+    mp3\_32 & MP3 32 kbit/s: tin nhắn thoại \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% =====================================================================
+\section{Xác thực}
+
+Dịch vụ có hai cách xác thực:
+\begin{enumerate}
+  \item \textbf{Khóa kết nối tổng đài.} Bộ kết nối của tổng đài gửi header \texttt{Authorization: Bearer <VG\_API\_KEY>}. Khóa này chỉ dùng được cho luồng cuộc gọi (\ep{/v1/calls}, \ep{/audio}, \ep{/end}) và \ep{/v1/analyze}; khóa không đọc được lịch sử, danh sách số hay báo cáo.
+  \item \textbf{Phiên đăng nhập.} Người dùng bảng điều khiển đăng nhập bằng tài khoản và mật khẩu; dịch vụ trả cookie \texttt{vg\_session} (HttpOnly, SameSite=Strict, hết hạn sau \texttt{VG\_SESSION\_HOURS} giờ, mặc định 12). Phiên đăng nhập dùng được mọi API.
+\end{enumerate}
+
+\POST{/v1/auth/login}
+\who{không}
+\begin{params}
+username & chuỗi & Tên tài khoản \\
+password & chuỗi & Mật khẩu \\
+\end{params}
+
+Thành công trả về thông tin người dùng và đặt cookie phiên. Sai tài khoản hoặc mật khẩu trả mã 401; sau 5 lần sai trong 5 phút, tài khoản bị chặn đăng nhập 5 phút (mã 429).
+\begin{code}
+{ "username": "admin", "full_name": "Quản trị hệ thống" }
+\end{code}
+
+\POST{/v1/auth/logout}
+\who{phiên đăng nhập}
+Hủy phiên hiện tại và xóa cookie.
+
+\GET{/v1/auth/me}
+\who{phiên đăng nhập}
+Trả về người dùng của phiên hiện tại, cùng dạng với phản hồi đăng nhập.
+
+\subsection{Mã lỗi}
+
+Lỗi trả về JSON \texttt{\{"detail": "<thông báo>"\}} với mã HTTP theo Bảng~\ref{tab:errors}.
+
+\begin{table}[tbp]
+  \centering\small
+  \caption{Mã lỗi HTTP.}
+  \label{tab:errors}
+  \begin{tabularx}{\linewidth}{@{}lX@{}}
+    \toprule
+    \textbf{Mã} & \textbf{Ý nghĩa} \\
+    \midrule
+    401 & Chưa đăng nhập, phiên hết hạn, hoặc khóa kết nối không đúng \\
+    403 & Khóa kết nối tổng đài gọi API dành cho bảng điều khiển \\
+    404 & Không tìm thấy cuộc gọi, bản ghi âm hoặc số điện thoại \\
+    415 & Không giải mã được tệp âm thanh \\
+    422 & Tham số không hợp lệ, hoặc âm thanh quá ngắn hay quá nhỏ để chấm \\
+    429 & Đăng nhập sai quá nhiều lần \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+% =====================================================================
+\section{Tích hợp tổng đài}
+
+Mỗi cuộc gọi là một phiên gồm ba bước (Hình~\ref{fig:seq}): mở phiên khi cuộc gọi được kết nối, gửi âm thanh theo từng đoạn trong khi đàm thoại, đóng phiên khi cúp máy. Bộ kết nối lấy luồng âm thanh của chiều khách hàng từ tổng đài (ví dụ qua media fork hoặc ghi âm theo luồng), chuyển thành PCM 16 kHz đơn kênh 16-bit little-endian, và gửi mỗi 0{,}5--1 giây.
+
+\begin{figure}[tbp]
+\centering
+\begin{tikzpicture}[font=\small, >={Stealth[length=2.2mm]},
+  actor/.style={draw=navy,fill=soft,rounded corners=2pt,minimum width=3.2cm,minimum height=8mm,align=center,font=\small\bfseries},
+  msg/.style={->,line width=0.7pt,draw=navy}, ret/.style={->,line width=0.6pt,draw=black!50,dashed},
+  t/.style={font=\scriptsize,fill=white,inner sep=1pt,align=center}]
+  \node[actor] (pbx) at (0,0) {Tổng đài};
+  \node[actor] (vg) at (6.2,0) {VoiceGuard};
+  \node[actor] (con) at (11.6,0) {Bảng điều khiển};
+  \foreach \n in {pbx,vg,con} \draw[black!25,line width=0.8pt] (\n.south) -- ++(0,-10.4);
+  \draw[msg] (0,-1.1) -- node[t,above]{POST /v1/calls\quad(số gọi đến, kênh)} (6.2,-1.1);
+  \draw[ret] (6.2,-1.7) -- node[t,above]{call\_id} (0,-1.7);
+  \draw[msg] (6.2,-1.4) -- node[t,above]{call\_started} (11.6,-1.4);
+  \begin{scope}[on background layer]\fill[soft] (-1.9,-2.3) rectangle (13.3,-7.5);\end{scope}
+  \node[font=\scriptsize\bfseries,text=navy,anchor=north east] at (13.25,-2.35) {lặp lại trong khi đàm thoại};
+  \draw[msg] (0,-3.1) -- node[t,above]{POST /v1/calls/\{id\}/audio\quad(PCM 0,5 s)} (6.2,-3.1);
+  \draw[ret] (6.2,-3.7) -- node[t,above]{new\_windows = [ ]} (0,-3.7);
+  \draw[msg] (0,-4.6) -- node[t,above]{POST /v1/calls/\{id\}/audio} (6.2,-4.6);
+  \node[t,draw=navy!40,rounded corners=1pt,anchor=west] at (6.4,-5.15) {đủ cửa sổ 4 s mới: chấm điểm};
+  \draw[ret] (6.2,-5.7) -- node[t,above]{risk\_level, spoof\_percent} (0,-5.7);
+  \draw[msg] (6.2,-5.9) -- node[t,above]{call\_update} (11.6,-5.9);
+  \draw[msg,draw=annred] (6.2,-6.8) -- node[t,above,text=annred]{alert (lần đầu lên HIGH)} (11.6,-6.8);
+  \draw[msg] (0,-8.3) -- node[t,above]{POST /v1/calls/\{id\}/end} (6.2,-8.3);
+  \draw[ret] (6.2,-8.9) -- node[t,above]{kết luận cuối} (0,-8.9);
+  \draw[msg] (6.2,-8.6) -- node[t,above]{call\_ended} (11.6,-8.6);
+  \draw[msg,draw=black!60] (11.6,-9.8) -- node[t,above]{POST /v1/calls/\{id\}/action, /verdict} (6.2,-9.8);
+\end{tikzpicture}
+\caption{Trình tự gọi API của một cuộc gọi.}
+\label{fig:seq}
+\end{figure}
+
+\POST{/v1/calls}
+\who{khóa kết nối tổng đài hoặc phiên đăng nhập}
+\begin{params}
+caller\_number & chuỗi & Số gọi đến. Để trống khi tổng đài không có số; \texttt{***} hoặc chuỗi không phải số là số ẩn \\
+channel & chuỗi & Kênh của đường dây (Bảng~\ref{tab:channels}), mặc định \texttt{none} \\
+agent & chuỗi & Máy nhánh hoặc mã nhân viên nhận cuộc gọi \\
+recording\_ref & chuỗi & Mã bản ghi âm của tổng đài, dùng để đối chiếu \\
+\end{params}
+
+Phản hồi chứa \key{call\_id} của phiên. Số trong danh sách đen nhận ngay \texttt{risk\_level = "HIGH"} và \texttt{screened\_by = "prefilter"}.
+\begin{code}
+{
+  "call_id": "04e6b765425c408393282c5794781cdc",
+  "audio_s": 0.0, "n_windows": 0, "skipped_silent": 0, "max_level": null,
+  "caller_category": "unknown", "channel": "opus12",
+  "score": null, "spoof_percent": null, "risk_level": null,
+  "recommended_action": null, "screened_by": "model"
+}
+\end{code}
+\key{caller\_category} nhận một trong các giá trị \texttt{registered}, \texttt{unknown}, \texttt{hidden}, \texttt{not\_provided}, \texttt{blacklist}.
+
+\POST{/v1/calls/\{call\_id\}/audio}
+\who{khóa kết nối tổng đài hoặc phiên đăng nhập}
+Thân yêu cầu là PCM 16 kHz, đơn kênh, 16-bit có dấu little-endian (số byte chẵn). Dịch vụ chấm mỗi cửa sổ 4 giây mới đủ dữ liệu, bước trượt 2 giây; cửa sổ im lặng (giữ máy, tắt tiếng) được bỏ qua và đếm vào \key{skipped\_silent}. Phản hồi gồm các cửa sổ mới chấm và kết luận hiện tại của cuộc gọi.
+\begin{code}
+{
+  "new_windows": [
+    { "start": 4.0, "end": 8.0, "score": -21.38, "level": "HIGH", "latency_ms": 31.1 }
+  ],
+  "call_id": "04e6b765425c408393282c5794781cdc",
+  "audio_s": 8.0, "n_windows": 3, "skipped_silent": 0, "max_level": "HIGH",
+  "caller_category": "unknown", "channel": "opus12",
+  "score": -20.74, "spoof_percent": 96.3, "risk_level": "HIGH",
+  "recommended_action": "Tạm dừng giao dịch, chuyển bộ phận phòng chống gian lận xử lý",
+  "screened_by": "model", "escalated_by_prefilter": false
+}
+\end{code}
+
+\POST{/v1/calls/\{call\_id\}/end}
+\who{khóa kết nối tổng đài hoặc phiên đăng nhập}
+Đóng phiên và trả kết luận cuối. Cuộc gọi ngắn hơn một cửa sổ nhưng dài từ 0{,}5 giây được chấm một lần trên âm thanh lặp lại. Âm thanh được giữ dạng WAV khi cuộc gọi đạt mức MEDIUM trở lên (\texttt{VG\_RECORD=flagged}), các cuộc gọi khác không được lưu âm thanh.
+\begin{code}
+{
+  "request_id": "04e6b765425c408393282c5794781cdc",
+  "duration_s": 31.5, "mode": "stream", "n_segments": 14, "skipped_silent": 0,
+  "caller_category": "unknown", "channel_simulated": "opus12",
+  "timing_ms": { "wall_s": 31.62 },
+  "score": -20.12, "spoof_percent": 95.8, "risk_level": "HIGH",
+  "recommended_action": "Tạm dừng giao dịch, chuyển bộ phận phòng chống gian lận xử lý",
+  "screened_by": "model", "escalated_by_prefilter": false
+}
+\end{code}
+
+\subsection{Ví dụ bộ kết nối}
+
+Đoạn Python sau mô phỏng một bộ kết nối: mở phiên, gửi âm thanh mỗi 0{,}5 giây theo đúng tốc độ nói và đóng phiên. Hệ thống đi kèm công cụ \texttt{python -m voiceguard.simulate} chạy nhiều cuộc gọi đồng thời theo cùng cách.
+\begin{code}
+import time, requests
+URL, H = "http://voiceguard:8000", {"Authorization": "Bearer " + API_KEY}
+
+call = requests.post(f"{URL}/v1/calls", headers=H, data={
+    "caller_number": "0912345678", "channel": "amrnb", "agent": "nv01"}).json()
+for chunk in pcm_chunks(stream, seconds=0.5):     # bytes PCM 16 kHz 16-bit
+    r = requests.post(f"{URL}/v1/calls/{call['call_id']}/audio",
+                      headers=H, data=chunk).json()
+    if r["risk_level"] == "HIGH":
+        pbx.flag(call_id=call["call_id"])          # ví dụ: hiện cảnh báo trên softphone
+final = requests.post(f"{URL}/v1/calls/{call['call_id']}/end", headers=H).json()
+\end{code}
+
+% =====================================================================
+\section{Phân tích tệp âm thanh}
+
+\POST{/v1/analyze}
+\who{khóa kết nối tổng đài hoặc phiên đăng nhập}
+\begin{params}
+file & tệp & Âm thanh bất kỳ định dạng ffmpeg đọc được (WAV, MP3, M4A, OGG, FLAC…), dài ít nhất 0{,}5 giây \\
+mode & chuỗi & \texttt{window} (mặc định): chấm từng cửa sổ 4 giây; \texttt{full}: chấm cả tệp một lần \\
+channel & chuỗi & Kênh cần mô phỏng trước khi chấm (Bảng~\ref{tab:channels}), mặc định \texttt{none} \\
+caller\_number & chuỗi & Số điện thoại liên quan, dùng cho lớp lọc số \\
+\end{params}
+
+\begin{code}
+curl -H "Authorization: Bearer $VG_API_KEY" -F file=@voice_message.m4a \
+     -F channel=mp3_32 http://voiceguard:8000/v1/analyze
+\end{code}
+
+Phản hồi gồm kết luận và chi tiết từng đoạn:
+\begin{code}
+{
+  "request_id": "9b2f0c...", "duration_s": 6.2, "mode": "window", "n_segments": 2,
+  "score": -19.86, "p_bonafide": 0.04, "spoof_percent": 95.1, "risk_level": "HIGH",
+  "recommended_action": "Tạm dừng giao dịch, chuyển bộ phận phòng chống gian lận xử lý",
+  "most_suspicious_segment": { "start": 2.2, "end": 6.2, "score": -21.03 },
+  "segments": [ { "start": 0.0, "end": 4.0, "score": -18.69, "level": "HIGH" }, ... ],
+  "policy": { "t_high": -17.24, "t_medium": -8.77, "calibrated": true },
+  "timing_ms": { "decode": 41.3, "model": 58.0, "rtf": 0.016 },
+  "screened_by": "model", "caller_category": "not_provided",
+  "channel_simulated": "mp3_32"
+}
+\end{code}
+
+% =====================================================================
+\section{API của bảng điều khiển}
+
+Các API trong mục này dùng phiên đăng nhập.
+
+\subsection{Sự kiện thời gian thực}
+
+\GET{/v1/events}
+Luồng server-sent events (\texttt{text/event-stream}). Mỗi sự kiện là một dòng \texttt{data:} chứa JSON có trường \key{type} (Bảng~\ref{tab:events}); dịch vụ gửi dòng \texttt{: ping} mỗi 15 giây khi không có sự kiện.
+
+\begin{table}[tbp]
+  \centering\small
+  \caption{Các loại sự kiện.}
+  \label{tab:events}
+  \begin{tabularx}{\linewidth}{@{}>{\ttfamily}lX@{}}
+    \toprule
+    \normalfont\textbf{type} & \textbf{Nội dung} \\
+    \midrule
+    call\_started & Cuộc gọi mới mở; \key{call} là bản ghi cuộc gọi kèm \key{policy} của kênh \\
+    call\_update & Có cửa sổ mới; \key{windows} cùng các trường kết luận như phản hồi của \ep{/audio} \\
+    alert & Cuộc gọi lần đầu lên mức HIGH; cũng được gửi tới webhook \\
+    call\_ended & Cuộc gọi kết thúc \\
+    action & Nhân viên chọn thao tác trên cuộc gọi \\
+    verdict & Có kết luận xác minh \\
+    numbers & Danh sách số thay đổi \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{Cuộc gọi}
+
+\GET{/v1/calls}
+\begin{params}
+status & chuỗi & \texttt{active} hoặc \texttt{ended} \\
+min\_level & chuỗi & Chỉ lấy cuộc gọi có mức cao nhất từ \texttt{LOW}, \texttt{MEDIUM} hoặc \texttt{HIGH} \\
+unreviewed & logic & \texttt{true}: chỉ lấy cuộc gọi chưa có kết luận \\
+hours & số & Chỉ lấy cuộc gọi bắt đầu trong số giờ gần nhất \\
+limit & số nguyên & Số dòng tối đa, mặc định 100 \\
+\end{params}
+Trả về danh sách cuộc gọi, mới nhất trước, mỗi phần tử có các trường như \ep{GET /v1/calls/\{call\_id\}} trừ \key{windows}, \key{caller\_history}, \key{caller\_lists}, \key{policy}.
+
+\GET{/v1/calls/\{call\_id\}}
+\begin{code}
+{
+  "id": "04e6b765425c408393282c5794781cdc", "status": "ended",
+  "started_at": 1794974571.22, "ended_at": 1794974602.84,
+  "caller_masked": "0912***678", "category": "unknown", "channel": "opus12",
+  "agent": "nv01", "recording_ref": "REC-20261118-0001", "duration_s": 31.5,
+  "n_windows": 14, "score": -20.12, "spoof_percent": 95.8,
+  "risk_level": "HIGH", "max_level": "HIGH", "screened_by": "model", "recording": 1,
+  "action": "hold", "action_at": 1794974590.1,
+  "verdict": null, "verdict_note": null, "verdict_by": null, "verdict_at": null,
+  "windows": [ { "start": 0.0, "end": 4.0, "score": -18.69, "level": "HIGH" }, ... ],
+  "caller_history": { "calls": 3, "high": 2 },
+  "caller_lists": [],
+  "policy": { "t_high": -17.24, "t_medium": -8.77, "calibrated": true }
+}
+\end{code}
+
+\GET{/v1/calls/\{call\_id\}/recording}
+Bản ghi âm WAV 16 kHz của cuộc gọi (chỉ có khi \key{recording} = 1). Bản ghi tự xóa sau \texttt{VG\_RECORD\_DAYS} ngày.
+
+\POST{/v1/calls/\{call\_id\}/action}
+\begin{params}
+action & chuỗi & \texttt{continue} (đã xác minh, cho phép tiếp tục), \texttt{verify} (yêu cầu xác thực bổ sung), \texttt{hold} (tạm dừng giao dịch), \texttt{transfer} (chuyển phòng chống gian lận) \\
+\end{params}
+Lưu thao tác cùng tài khoản thực hiện. \texttt{hold} và \texttt{transfer} được gửi tới webhook.
+
+\POST{/v1/calls/\{call\_id\}/verdict}
+\begin{params}
+verdict & chuỗi & \texttt{fraud} (gian lận) hoặc \texttt{genuine} (chính chủ) \\
+note & chuỗi & Ghi chú, lý do kết luận \\
+\end{params}
+Kết luận \texttt{fraud} tự động đưa số gọi đến vào danh sách đen.
+
+\subsection{Danh sách số}
+
+\GET{/v1/numbers?list=blacklist|registered|suggested}
+Danh sách đen, số đã định danh, hoặc số đề xuất chặn (số có từ hai cuộc gọi ở mức HIGH trong 30 ngày gần nhất, chưa nằm trong danh sách đen).
+\begin{code}
+[ { "key": "48721361535dafb09856ca1aba5956d5", "masked": "0901***567",
+    "added_at": 1794974156.47, "source": "Thêm thủ công",
+    "note": "Báo cáo từ khách hàng", "calls": 0, "last_call": null } ]
+\end{code}
+
+\POST{/v1/numbers}
+\begin{params}
+number & chuỗi & Số điện thoại cần thêm \\
+key & chuỗi & Thay cho \key{number}: mã băm của một số trong danh sách đề xuất \\
+list & chuỗi & \texttt{blacklist} (mặc định) hoặc \texttt{registered} \\
+note & chuỗi & Ghi chú \\
+\end{params}
+
+\DELETE{/v1/numbers/\{key\}?list=blacklist|registered}
+Gỡ số khỏi danh sách.
+
+Hai danh sách cũng được nạp khi khởi động từ tệp văn bản (mỗi dòng một số) qua \texttt{VG\_BLACKLIST} và \texttt{VG\_REGISTERED}, phù hợp khi đồng bộ danh bạ khách hàng từ CRM.
+
+\subsection{Báo cáo và trạng thái}
+
+\GET{/v1/stats?hours=24}
+\begin{code}
+{ "total": 67, "active": 0, "high": 43, "medium": 12, "low": 12, "blocked": 4,
+  "fraud": 2, "genuine": 1, "false_alarm": 1, "pending": 52, "held": 0, "transferred": 0,
+  "latency_p95_ms": 71.4, "by_hour": [ { "h": 23, "n": 67, "high": 43, "medium": 12 } ],
+  "open_calls": 0, "hours": 24 }
+\end{code}
+
+\GET{/health}
+\who{không}
+Trạng thái dịch vụ: thiết bị, mô hình, ngưỡng mặc định, các kênh và tình trạng hiệu chỉnh, kích thước danh sách số, thống kê gom lô (\key{batches}, \key{windows}, \key{open\_calls}). Dùng cho giám sát hạ tầng.
+
+% =====================================================================
+\section{Webhook}
+
+Khi đặt \texttt{VG\_WEBHOOK\_URL}, dịch vụ gửi \texttt{POST} JSON tới địa chỉ này trong hai trường hợp: cuộc gọi lần đầu lên mức HIGH (\texttt{type = "alert"}) và nhân viên chọn \texttt{hold} hoặc \texttt{transfer} (\texttt{type = "action"}). Thân yêu cầu cùng dạng với sự kiện SSE; \key{call} là bản ghi cuộc gọi như \ep{GET /v1/calls/\{call\_id\}}. Dịch vụ gửi một lần, thời gian chờ 3 giây, không thử lại; hệ thống nhận nên đối chiếu bằng \key{call.id} hoặc \key{call.recording\_ref}.
+\begin{code}
+{ "type": "alert",
+  "call": { "id": "04e6b7...", "caller_masked": "0912***678", "channel": "opus12",
+            "agent": "nv01", "recording_ref": "REC-20261118-0001",
+            "risk_level": "HIGH", "spoof_percent": 96.3, ... } }
+\end{code}
+
+% =====================================================================
+\section{Cấu hình dịch vụ}
+
+Dịch vụ chạy bằng \texttt{uvicorn voiceguard.api:app --host 0.0.0.0 --port 8000} và đọc cấu hình từ biến môi trường (Bảng~\ref{tab:env}).
+
+\begin{table}[tbp]
+  \centering\small
+  \caption{Biến môi trường.}
+  \label{tab:env}
+  \begin{tabularx}{\linewidth}{@{}>{\ttfamily}lX@{}}
+    \toprule
+    \normalfont\textbf{Biến} & \textbf{Ý nghĩa} \\
+    \midrule
+    VG\_API\_KEY & Khóa của bộ kết nối tổng đài \\
+    VG\_ADMIN\_PASSWORD & Mật khẩu tài khoản \texttt{admin} tạo ở lần chạy đầu \\
+    VG\_SESSION\_HOURS & Thời hạn phiên đăng nhập, mặc định 12 giờ \\
+    VG\_DB & Tệp SQLite, mặc định \texttt{data/voiceguard.db} \\
+    VG\_RECORD & \texttt{flagged} (mặc định), \texttt{all} hoặc \texttt{none} \\
+    VG\_RECORD\_DAYS & Số ngày giữ bản ghi âm, mặc định 30 \\
+    VG\_WEBHOOK\_URL & Địa chỉ nhận webhook \\
+    VG\_BLACKLIST, VG\_REGISTERED & Tệp số điện thoại nạp khi khởi động \\
+    VG\_CKPT, VG\_POLICY & Checkpoint và ngưỡng mặc định \\
+    VG\_POLICY\_DIR & Thư mục ngưỡng theo kênh (\texttt{L14\_<kênh>\_4s.json}) \\
+    VG\_DEVICE, VG\_FP16 & Thiết bị suy luận và chế độ FP16 \\
+    VG\_BATCH\_MAX, VG\_BATCH\_WAIT\_MS & Kích thước lô tối đa (16) và thời gian chờ gom lô (10 ms) \\
+    VG\_AUDIT\_LOG & Nhật ký kiểm toán JSONL, không chứa âm thanh và số điện thoại \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\end{document}

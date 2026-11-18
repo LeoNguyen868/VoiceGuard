@@ -8,3 +8,13 @@ results/*.json
 data/
 datasets/*_labels.txt
 samples/
+
+# LaTeX build files of the documents
+docs/**/*.aux
+docs/**/*.log
+docs/**/*.out
+docs/**/*.toc
+docs/**/*.fls
+docs/**/*.fdb_latexmk
+docs/**/*.xdv
+docs/**/*.synctex.gz

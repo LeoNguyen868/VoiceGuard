@@ -1,0 +1,329 @@
+\documentclass[11pt]{article}
+\input{../common/preamble}
+\hypersetup{pdftitle={VoiceGuard - Hướng dẫn sử dụng giao diện}}
+
+\begin{document}
+\vgtitle{Hướng dẫn sử dụng giao diện}{Bảng điều khiển giám sát cuộc gọi, xác minh và phân tích tệp âm thanh}{Phiên bản 1.0 · Tháng 11/2026}
+
+\tableofcontents
+\clearpage
+
+% =====================================================================
+\section{Giới thiệu}
+
+VoiceGuard là hệ thống giám định giọng nói, phát hiện giọng nói nhân bản (voice cloning, deepfake audio) trong cuộc gọi đến kênh thoại của doanh nghiệp. Hệ thống chấm điểm âm thanh theo từng cửa sổ 4 giây trong khi cuộc gọi đang diễn ra, gán mức cảnh báo cho cuộc gọi và đưa kết quả lên bảng điều khiển web để nhân viên xử lý ngay trong cuộc gọi.
+
+Tài liệu này hướng dẫn sử dụng bảng điều khiển web. Cách tích hợp với tổng đài và các hệ thống khác được trình bày trong tài liệu \emph{API tích hợp}.
+
+\subsection{Kiến trúc tổng quan}
+
+Hình~\ref{fig:arch} mô tả vị trí của VoiceGuard giữa kênh thoại và người xử lý. Tổng đài chuyển âm thanh của từng cuộc gọi tới dịch vụ VoiceGuard theo thời gian thực. Dịch vụ xử lý âm thanh qua bốn bước:
+\begin{enumerate}
+  \item lớp lọc số đối chiếu số gọi đến với danh sách đen và danh sách số đã định danh;
+  \item âm thanh được cắt thành cửa sổ 4 giây, bước trượt 2 giây, và gom thành lô cùng cửa sổ của các cuộc gọi khác;
+  \item mô hình CNN-Transformer chấm điểm từng cửa sổ;
+  \item chính sách ngưỡng của kênh thoại quy điểm thành tỷ lệ giả mạo và mức cảnh báo.
+\end{enumerate}
+Kết quả được lưu vào cơ sở dữ liệu và đẩy tới bảng điều khiển ngay khi có cửa sổ mới. Khi cuộc gọi lên mức rủi ro cao hoặc nhân viên tạm giữ giao dịch, hệ thống gửi webhook tới CRM hoặc core banking.
+
+\begin{figure}[tbp]
+  \centering
+  \resizebox{\linewidth}{!}{\input{../common/architecture}}
+  \caption{Kiến trúc tổng quan của hệ thống VoiceGuard.}
+  \label{fig:arch}
+\end{figure}
+
+\subsection{Luồng nghiệp vụ}
+
+Bảng~\ref{tab:flow} tóm tắt các bước xử lý một cuộc gọi, từ lúc cuộc gọi được kết nối tới lúc số gọi đến được đưa vào danh sách đen.
+
+\begin{table}[tbp]
+  \centering\small
+  \caption{Luồng xử lý một cuộc gọi trên bảng điều khiển.}
+  \label{tab:flow}
+  \begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}p{3.3cm}X@{}}
+    \toprule
+    \textbf{Bước} & \textbf{Màn hình} & \textbf{Nội dung} \\
+    \midrule
+    1 & Cuộc gọi đang diễn ra & Cuộc gọi xuất hiện ngay khi tổng đài kết nối; mức cảnh báo cập nhật mỗi 2 giây. \\
+    2 & Ngăn chi tiết cuộc gọi & Nhân viên đọc khuyến nghị và chọn thao tác: cho phép tiếp tục, yêu cầu xác thực bổ sung, tạm dừng giao dịch hoặc chuyển phòng chống gian lận. \\
+    3 & Chờ xác minh & Sau khi kết thúc, cuộc gọi ở mức cần xác minh hoặc rủi ro cao vào hàng đợi; bản ghi âm được giữ lại để nghe lại. \\
+    4 & Ngăn chi tiết cuộc gọi & Chuyên viên nghe lại các đoạn nghi vấn và kết luận gian lận hoặc chính chủ. \\
+    5 & Quản lý số điện thoại & Kết luận gian lận tự động đưa số vào danh sách đen; cuộc gọi sau từ số này bị chặn mà không cần chạy mô hình. \\
+    6 & Báo cáo tổng quan & Người giám sát theo dõi lưu lượng, tỷ lệ cảnh báo, báo động nhầm và độ trễ xử lý. \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\subsection{Mức cảnh báo}
+
+Mỗi cuộc gọi nhận một trong ba mức cảnh báo (Bảng~\ref{tab:levels}). Tỷ lệ giả mạo là xác suất giọng nói là giọng nhân bản, tính từ điểm trung bình của các cửa sổ đã chấm theo hiệu chỉnh riêng của kênh thoại.
+
+\begin{table}[tbp]
+  \centering\small
+  \caption{Mức cảnh báo và khuyến nghị xử lý.}
+  \label{tab:levels}
+  \begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{2.6cm}X@{}}
+    \toprule
+    \textbf{Mức} & \textbf{Ý nghĩa và khuyến nghị} \\
+    \midrule
+    \textcolor{green!45!black}{\textbf{An toàn}} & Điểm cao hơn ngưỡng trên. Cho phép tiếp tục giao dịch bình thường. \\
+    \textcolor{orange!85!black}{\textbf{Cần xác minh}} & Điểm nằm giữa hai ngưỡng, hoặc số gọi đến là số lạ, số ẩn. Xác thực bổ sung: chủ động gọi lại số chính chủ hoặc xác thực qua kênh thứ hai. \\
+    \textcolor{annred}{\textbf{Rủi ro cao}} & Điểm thấp hơn ngưỡng dưới, hoặc số gọi đến nằm trong danh sách đen. Tạm dừng giao dịch, chuyển bộ phận phòng chống gian lận. \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+Trạng thái số gọi đến gồm bốn loại: \emph{số đã định danh} (có trong danh bạ khách hàng), \emph{số lạ / chưa đăng ký}, \emph{số ẩn} và \emph{danh sách đen}. Số lạ và số ẩn luôn ở mức tối thiểu là cần xác minh; số trong danh sách đen bị chặn ngay ở lớp lọc số.
+
+% =====================================================================
+\section{Đăng nhập và bố cục chung}
+
+\subsection{Đăng nhập}
+
+Bảng điều khiển mở tại địa chỉ \ep{http://<máy chủ>:8000/}. Người dùng chưa đăng nhập được chuyển tới trang đăng nhập (Hình~\ref{fig:login}).
+
+\begin{figure}[tbp]
+  \centering
+  \shot{login}
+  \caption{Trang đăng nhập.}
+  \label{fig:login}
+  \begin{flushleft}\small
+\begin{legend}
+  \item \textbf{Tài khoản:} tên đăng nhập do quản trị viên cấp.
+  \item \textbf{Mật khẩu:} tối thiểu 8 ký tự.
+  \item \textbf{Hiện mật khẩu:} bấm để hiện hoặc ẩn mật khẩu đang nhập.
+  \item \textbf{Đăng nhập:} gửi thông tin đăng nhập; phiên đăng nhập có hiệu lực 12 giờ.
+\end{legend}
+  \end{flushleft}
+\end{figure}
+
+Khi tài khoản hoặc mật khẩu không đúng, thông báo lỗi hiện phía trên ô nhập (Hình~\ref{fig:loginerr}). Sau 5 lần đăng nhập sai trong 5 phút, tài khoản bị tạm chặn đăng nhập trong 5 phút.
+
+\begin{figure}[tbp]
+  \centering
+  \shot[0.62\linewidth]{login_error}
+  \caption{Thông báo đăng nhập không thành công.}
+  \label{fig:loginerr}
+  \begin{flushleft}\small
+\begin{legend}
+  \item \textbf{Thông báo lỗi:} sai tài khoản hoặc mật khẩu, tài khoản bị khóa, hoặc đăng nhập sai quá nhiều lần.
+\end{legend}
+  \end{flushleft}
+\end{figure}
+
+\subsection{Bố cục chung và đăng xuất}
+
+Mọi màn hình của bảng điều khiển có chung bố cục (Hình~\ref{fig:layout}).
+
+\begin{figure}[tbp]
+  \centering
+  \shot{layout}
+  \caption{Bố cục chung của bảng điều khiển.}
+  \label{fig:layout}
+  \begin{flushleft}\small
+\begin{legend}
+  \item \textbf{Thanh điều hướng:} năm màn hình chức năng. Số trên nền cam là số cuộc gọi rủi ro cao đang diễn ra và số cuộc gọi đang chờ xác minh. Dòng \emph{Đã kết nối} ở cuối cho biết bảng điều khiển đang nhận sự kiện trực tiếp từ máy chủ.
+  \item \textbf{Tiêu đề màn hình} đang mở.
+  \item \textbf{Đồng hồ} của máy trạm, dùng để đối chiếu thời điểm cuộc gọi.
+  \item \textbf{Người dùng} đang đăng nhập: họ tên và tên tài khoản.
+  \item \textbf{Đăng xuất:} kết thúc phiên đăng nhập và quay về trang đăng nhập. Phiên cũng tự hết hạn sau 12 giờ.
+  \item \textbf{Vùng nội dung} của màn hình đang mở.
+\end{legend}
+  \end{flushleft}
+\end{figure}
+
+% =====================================================================
+\section{Cuộc gọi đang diễn ra}
+
+Màn hình \emph{Cuộc gọi đang diễn ra} (Hình~\ref{fig:live}) liệt kê mọi cuộc gọi đang kết nối. Bảng tự cập nhật mỗi khi có cửa sổ âm thanh mới được chấm; cuộc gọi rủi ro cao được đưa lên đầu bảng kèm âm báo. Phía dưới là bảng \emph{Cuộc gọi vừa kết thúc}.
+
+\begin{figure}[tbp]
+  \centering
+  \shot{live}
+  \caption{Màn hình cuộc gọi đang diễn ra.}
+  \label{fig:live}
+  \begin{flushleft}\small
+\begin{legend}
+  \item \textbf{Tóm tắt:} số cuộc gọi đang diễn ra, số cuộc gọi rủi ro cao và cần xác minh.
+  \item \textbf{Cột thông tin:} số gọi đến (đã che một phần), trạng thái số, kênh cuộc gọi, thời lượng, biểu đồ rủi ro, tỷ lệ giả mạo, mức cảnh báo và thao tác đã chọn.
+  \item \textbf{Cuộc gọi rủi ro cao:} dòng nền đỏ, luôn nằm đầu bảng. Bấm vào một dòng bất kỳ để mở ngăn chi tiết.
+  \item \textbf{Biểu đồ rủi ro:} điểm của từng cửa sổ 4 giây theo thời gian; màu của điểm là mức cảnh báo của cửa sổ đó.
+  \item \textbf{Tỷ lệ giả mạo} hiện tại của cuộc gọi.
+  \item \textbf{Mức cảnh báo} hiện tại: an toàn, cần xác minh hoặc rủi ro cao.
+  \item \textbf{Cuộc gọi vừa kết thúc:} các cuộc gọi kết thúc gần nhất, giữ mức cảnh báo cao nhất đạt được trong cuộc gọi.
+\end{legend}
+  \end{flushleft}
+\end{figure}
+
+\subsection{Ngăn chi tiết cuộc gọi}
+
+Bấm vào một cuộc gọi để mở ngăn chi tiết ở cạnh phải (Hình~\ref{fig:drawerlive}). Ngăn chi tiết tự cập nhật trong khi cuộc gọi tiếp diễn; phím \texttt{Esc} hoặc nút $\times$ đóng ngăn.
+
+\begin{figure}[tbp]
+  \centering
+  \shot{drawer_live}
+  \caption{Ngăn chi tiết của một cuộc gọi đang diễn ra.}
+  \label{fig:drawerlive}
+  \begin{flushleft}\small
+\begin{legend}
+  \item \textbf{Số gọi đến} của cuộc gọi.
+  \item \textbf{Thông tin cuộc gọi:} trạng thái số, kênh cuộc gọi, thời điểm bắt đầu, tình trạng và thời lượng.
+  \item \textbf{Kết luận hiện tại:} mức cảnh báo, khuyến nghị xử lý và tỷ lệ giả mạo.
+  \item \textbf{Biến thiên rủi ro theo thời gian:} điểm từng cửa sổ so với hai ngưỡng của kênh.
+  \item \textbf{Thao tác xử lý:} \emph{Đã xác minh, cho phép tiếp tục}; \emph{Yêu cầu xác thực bổ sung}; \emph{Tạm dừng giao dịch}; \emph{Chuyển phòng chống gian lận}. Hai thao tác sau được gửi tới CRM qua webhook để giữ giao dịch.
+  \item \textbf{Kết luận xác minh:} ghi chú và hai nút \emph{Xác nhận gian lận \& Chặn số}, \emph{Xác nhận chính chủ}.
+  \item \textbf{Thông tin chi tiết:} lịch sử của số gọi đến (số cuộc gọi, số lần cảnh báo), danh sách chứa số, mã file ghi âm của tổng đài, điểm và ngưỡng, mã phiên cuộc gọi.
+\end{legend}
+  \end{flushleft}
+\end{figure}
+
+% =====================================================================
+\section{Chờ xác minh}
+
+Màn hình \emph{Chờ xác minh} (Hình~\ref{fig:review}) là hàng đợi của chuyên viên phòng chống gian lận. Hàng đợi gồm các cuộc gọi đã kết thúc ở mức cần xác minh hoặc rủi ro cao và chưa có kết luận.
+
+\begin{figure}[tbp]
+  \centering
+  \shot{review}
+  \caption{Hàng đợi chờ xác minh.}
+  \label{fig:review}
+  \begin{flushleft}\small
+\begin{legend}
+  \item \textbf{Bộ lọc:} \emph{Chờ xác minh} chỉ hiện cuộc gọi chưa có kết luận; \emph{Tất cả hồ sơ} hiện mọi cuộc gọi bị gắn cờ.
+  \item \textbf{Làm mới} danh sách.
+  \item \textbf{Cột thông tin:} thời gian, số gọi đến, trạng thái số, kênh, thời lượng, mức rủi ro cao nhất, tỷ lệ giả mạo, thao tác của nhân viên và kết luận xác minh.
+  \item \textbf{Kết luận xác minh:} \emph{Chờ xác minh}, \emph{Gian lận / Giả mạo} hoặc \emph{Khách chính chủ}.
+\end{legend}
+  \end{flushleft}
+\end{figure}
+
+\subsection{Nghe lại và kết luận}
+
+Bấm vào một cuộc gọi trong hàng đợi để mở ngăn chi tiết (Hình~\ref{fig:drawerreview}). Bản ghi âm chỉ được giữ cho cuộc gọi bị gắn cờ và tự xóa sau 30 ngày.
+
+\begin{figure}[tbp]
+  \centering
+  \shot{drawer_review}
+  \caption{Nghe lại bản ghi âm và kết luận xác minh.}
+  \label{fig:drawerreview}
+  \begin{flushleft}\small
+\begin{legend}
+  \item \textbf{Trình phát bản ghi âm} của cuộc gọi.
+  \item \textbf{Thanh phân đoạn:} mỗi ô là một cửa sổ 4 giây, tô màu theo mức cảnh báo; bấm vào ô để nghe đúng đoạn đó.
+  \item \textbf{Đoạn nghi vấn:} các đoạn có điểm thấp nhất, xếp từ nghi vấn nhất; bấm để nghe.
+  \item \textbf{Ghi chú:} lý do kết luận, ví dụ kết quả gọi lại số chính chủ.
+  \item \textbf{Kết luận:} \emph{Xác nhận gian lận \& Chặn số} lưu kết luận và đưa số gọi đến vào danh sách đen; \emph{Xác nhận chính chủ} lưu kết luận và được tính vào tỷ lệ báo động nhầm.
+\end{legend}
+  \end{flushleft}
+\end{figure}
+
+% =====================================================================
+\section{Quản lý số điện thoại}
+
+Màn hình \emph{Quản lý số điện thoại} (Hình~\ref{fig:numbers}) quản lý hai danh sách dùng cho lớp lọc số và danh sách đề xuất chặn. Số điện thoại chỉ được lưu dưới dạng mã băm và dạng đã che.
+
+\begin{figure}[tbp]
+  \centering
+  \shot{numbers}
+  \caption{Danh sách đen.}
+  \label{fig:numbers}
+  \begin{flushleft}\small
+\begin{legend}
+  \item \textbf{Danh sách:} \emph{Danh sách đen (Blacklist)}, \emph{Số đã định danh} và \emph{Đề xuất chặn}.
+  \item \textbf{Thêm số:} nhập số điện thoại, ghi chú và bấm \emph{Thêm số}.
+  \item \textbf{Cột thông tin:} số điện thoại (đã che), nguồn tạo (thêm thủ công, xác nhận gian lận từ cuộc gọi, duyệt từ đề xuất), ghi chú, ngày thêm, tổng cuộc gọi và cuộc gọi gần nhất.
+  \item \textbf{Gỡ bỏ} số khỏi danh sách.
+\end{legend}
+  \end{flushleft}
+\end{figure}
+
+\begin{figure}[tbp]
+  \centering
+  \shot{numbers_suggested}
+  \caption{Danh sách đề xuất chặn.}
+  \label{fig:suggested}
+  \begin{flushleft}\small
+\begin{legend}
+  \item \textbf{Đề xuất chặn:} số gọi đến nhiều lần ở mức rủi ro cao nhưng chưa nằm trong danh sách đen.
+  \item \textbf{Cột thông tin:} số lần cảnh báo, số kết luận gian lận và chính chủ, cuộc gọi gần nhất.
+  \item \textbf{Chặn số:} đưa số vào danh sách đen.
+\end{legend}
+  \end{flushleft}
+\end{figure}
+
+% =====================================================================
+\section{Báo cáo tổng quan}
+
+Màn hình \emph{Báo cáo tổng quan} (Hình~\ref{fig:overview}) thống kê 24 giờ gần nhất.
+
+\begin{figure}[tbp]
+  \centering
+  \shot{overview}
+  \caption{Báo cáo tổng quan.}
+  \label{fig:overview}
+  \begin{flushleft}\small
+\begin{legend}
+  \item \textbf{Chỉ số chính:} tổng cuộc gọi, đang kết nối, rủi ro cao, cần xác minh, chặn do danh sách đen, chờ xác minh, xác nhận gian lận, tỷ lệ báo động nhầm (tỷ lệ cuộc gọi bị gắn cờ được kết luận chính chủ), độ trễ xử lý P95 của một cửa sổ và số giao dịch đã tạm giữ.
+  \item \textbf{Lưu lượng cuộc gọi theo từng giờ}, chia theo mức cảnh báo.
+  \item \textbf{Cuộc gọi rủi ro cao gần nhất}; bấm vào một dòng để mở ngăn chi tiết.
+\end{legend}
+  \end{flushleft}
+\end{figure}
+
+% =====================================================================
+\section{Phân tích file âm thanh}
+
+Màn hình \emph{Phân tích file âm thanh} kiểm tra một tệp ghi âm hoặc tin nhắn thoại ngoài luồng cuộc gọi, ví dụ đoạn ghi âm khách hàng gửi tới. Bước 1 chọn âm thanh, bước 2 chọn kênh truyền mà âm thanh đã đi qua (Hình~\ref{fig:checkin}).
+
+\begin{figure}[tbp]
+  \centering
+  \shot[0.86\linewidth]{check_input}
+  \caption{Chọn âm thanh và kênh truyền.}
+  \label{fig:checkin}
+  \begin{flushleft}\small
+\begin{legend}
+  \item \textbf{Nguồn âm thanh:} \emph{Tải file lên} (WAV, MP3, M4A, OGG, FLAC…), \emph{Thu âm trực tiếp} từ micro, hoặc \emph{File mẫu}.
+  \item \textbf{Thư viện mẫu:} giọng thật và giọng giả mạo AI từ các bộ dữ liệu In-the-Wild, ASVspoof 5 và SEA-Spoof tiếng Việt, có nhãn đối chứng.
+  \item \textbf{Trình phát} âm thanh đã chọn.
+  \item \textbf{Kênh truyền cuộc gọi:} tệp gốc, Zalo/Messenger (Opus), di động thông thường (AMR-NB), VoLTE (AMR-WB), máy bàn (G.711), mạng 2G (GSM). Hệ thống mô phỏng codec của kênh rồi áp dụng ngưỡng của kênh đó. Kênh mờ là kênh máy chủ chưa hỗ trợ.
+  \item \textbf{Phân tích giọng nói.}
+\end{legend}
+  \end{flushleft}
+\end{figure}
+
+Kết quả hiện ở cột bên phải (Hình~\ref{fig:checkres}).
+
+\begin{figure}[tbp]
+  \centering
+  \shot[0.86\linewidth]{check_result}
+  \caption{Kết quả phân tích tệp.}
+  \label{fig:checkres}
+  \begin{flushleft}\small
+\begin{legend}
+  \item \textbf{Kết luận} và tỷ lệ giả mạo.
+  \item \textbf{Thang đo} từ giả mạo tới giọng thật; vạch tròn là vị trí của tệp.
+  \item \textbf{Khuyến nghị xử lý} theo mức cảnh báo.
+  \item \textbf{Phân đoạn nghi vấn:} số đoạn có dấu hiệu bất thường và thanh màu theo từng đoạn; bấm để nghe đoạn nghi vấn nhất.
+  \item \textbf{Nhãn đối chứng:} chỉ có với file mẫu, so sánh nhãn thật của mẫu với kết quả phân tích.
+  \item \textbf{Thông số kỹ thuật:} điểm, ngưỡng, số cửa sổ và thời gian xử lý.
+\end{legend}
+  \end{flushleft}
+\end{figure}
+
+% =====================================================================
+\section{Quản trị tài khoản}
+
+Lần khởi động đầu tiên, hệ thống tạo tài khoản \texttt{admin}. Mật khẩu là giá trị của biến môi trường \texttt{VG\_\allowbreak ADMIN\_\allowbreak PASSWORD}; khi biến này không được đặt, mật khẩu ngẫu nhiên được ghi vào tệp \texttt{data/\allowbreak admin-password.txt} trên máy chủ. Mọi tài khoản dùng được toàn bộ các màn hình. Quản trị viên quản lý tài khoản trên máy chủ bằng năm lệnh, theo thứ tự: tạo tài khoản (hệ thống hỏi mật khẩu), liệt kê tài khoản, đổi mật khẩu, khóa và mở khóa tài khoản.
+
+\begin{code}
+python -m voiceguard.users add nv01 --name "Nguyễn Văn An"
+python -m voiceguard.users list
+python -m voiceguard.users passwd nv01
+python -m voiceguard.users disable nv01
+python -m voiceguard.users enable nv01
+\end{code}
+
+Đổi mật khẩu hoặc khóa tài khoản kết thúc ngay mọi phiên đăng nhập của tài khoản đó.
+
+\end{document}

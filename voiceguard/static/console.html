@@ -238,10 +238,11 @@ function renderCheck() {
   $("view").innerHTML = `
     <div class="head"><div class="grow"><h1>Kiểm tra tệp</h1>
       <p class="sub">Tin nhắn thoại hoặc bản ghi khách hàng gửi tới.</p></div></div>
-    <iframe id="checkFrame" src="/check?embed=1" title="Kiểm tra tệp" style="width:100%;border:0;display:block;height:1200px"></iframe>`;
+    <iframe id="checkFrame" src="/check?embed=1" title="Kiểm tra tệp" style="width:100%;border:0;display:block;height:700px"></iframe>`;
   const f = $("checkFrame");
-  const fit = () => { try { f.style.height = f.contentDocument.documentElement.scrollHeight + "px"; } catch {} };
-  f.onload = () => { fit(); new ResizeObserver(fit).observe(f.contentDocument.body); };
+  // Height of the tool's own content, not of the frame's viewport, so the frame can shrink as well as grow.
+  const fit = () => { try { f.style.height = Math.ceil(f.contentDocument.querySelector(".wrap").getBoundingClientRect().height) + 4 + "px"; } catch {} };
+  f.onload = () => { fit(); new ResizeObserver(fit).observe(f.contentDocument.querySelector(".wrap")); };
 }
 
 function renderLive() {
@@ -413,7 +414,7 @@ function bindPlayer(c) {
 (async () => {
   try {
     health = await api("/health");
-    $("modelInfo").textContent = health.model?.random_weights ? "Chế độ thử: trọng số ngẫu nhiên" : `Mô hình: encoder ${health.model?.num_layers ?? "?"} lớp, ${health.device.toUpperCase()}`;
+    if (!health.model?.random_weights) $("modelInfo").textContent = `Mô hình ${health.model?.num_layers ?? ""} lớp · ${health.device.toUpperCase()}`;
     const live = await api("/v1/calls?status=active&limit=500");
     for (const c of live) { const d = await api(`/v1/calls/${c.id}`); active.set(c.id, d); }
     recent = await api("/v1/calls?status=ended&limit=12");

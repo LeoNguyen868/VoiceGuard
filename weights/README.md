@@ -21,3 +21,5 @@ python -m voiceguard.convert export-head --ckpt ckpt/control_L14_head.pt --dst w
 |---|---|
 | `L14_head.pt` | `01983bbf6d56e5bd37f935c56fbbadf84f0f9d2b9716a999e60bbfcbe56dbc88` |
 | `voiceguard_L14.pt` | `a0457aa6fa538be78b5e8a808e1979a787e9a85142c2665a48e7c7001172838c` |
+
+Mã của `voiceguard_L14.pt` là của bản dựng trên PC ngày 19-11-2026, trước khi `assemble` ghi thêm SHA-256 của hai tệp đầu vào. Mỗi lần dựng ghi thời điểm dựng vào checkpoint, nên mã của tệp này khác nhau giữa các lần dựng. Để kiểm tra một bản dựng mới, so `L14_head.pt` với bảng trên, chạy `assemble` thành công (dấu vân tay encoder khớp) và xem `base_sha256`, `head_sha256` trong `/health`.

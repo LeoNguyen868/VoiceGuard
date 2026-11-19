@@ -87,7 +87,8 @@ def cmd_assemble(args):
     print(f"encoder: first {L} layers of {os.path.basename(args.base)} ({name}), fingerprint matches")
     _save(dict(format=FORMAT, backend_cfg=head["backend_cfg"], tiny=tiny, num_layers=L, state_dict=sd,
                trained=head.get("trained"), source=f"{os.path.basename(args.base)} + {os.path.basename(args.head)}",
-               assembled_at=_now()), args.dst)
+               base_sha256=sha256_file(args.base), head_sha256=sha256_file(args.head),
+               head_source_sha256=head.get("source_sha256"), assembled_at=_now()), args.dst)
 
 
 def _now():

@@ -19,5 +19,5 @@ python -m voiceguard.convert export-head --ckpt ckpt/control_L14_head.pt --dst w
 
 | File | SHA-256 |
 |---|---|
-| `L14_head.pt` | *(điền sau khi xuất)* |
-| `voiceguard_L14.pt` | *(điền sau khi dựng)* |
+| `L14_head.pt` | `01983bbf6d56e5bd37f935c56fbbadf84f0f9d2b9716a999e60bbfcbe56dbc88` |
+| `voiceguard_L14.pt` | `a0457aa6fa538be78b5e8a808e1979a787e9a85142c2665a48e7c7001172838c` |

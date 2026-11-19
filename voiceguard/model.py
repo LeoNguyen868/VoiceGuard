@@ -101,7 +101,8 @@ def load_detector(path, device="cpu", num_layers=None):
         sd, dropped = truncate_state_dict(sd, num_layers)
     model.load_state_dict(sd, strict=True)
     model.eval().to(device)
-    info = {k: ckpt.get(k) for k in ("source", "source_sha256", "converted_at", "trained")}
+    info = {k: ckpt[k] for k in ("source", "source_sha256", "converted_at", "base_sha256", "head_sha256",
+                             "head_source_sha256", "assembled_at", "trained") if ckpt.get(k) is not None}
     info.update(path=os.path.abspath(path), num_layers=num_layers,
                 dropped_layers=sorted({int(_LAYER_KEY.match(k)[1]) for k in dropped}))
     return model, info

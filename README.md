@@ -25,7 +25,7 @@ So với mô hình gốc 24 lớp, bản này bền hơn khi âm thanh đi qua c
 
 ```bash
 python3.12 -m venv .venv && . .venv/bin/activate
-pip install torch --index-url https://download.pytorch.org/whl/cu128   # hoặc .../whl/cpu
+pip install torch --index-url https://download.pytorch.org/whl/cu130   # GPU RTX 50 (sm_120); hoặc .../whl/cpu
 pip install -r requirements.txt
 python -m voiceguard.channel        # kiểm tra ffmpeg chạy được những codec nào
 ```
@@ -57,7 +57,7 @@ python -m voiceguard.convert assemble --base weights/nes2netx_itw_vg.pt --head w
 - **Webhook:** `VG_WEBHOOK_URL` nhận JSON khi một cuộc gọi lên mức rủi ro cao hoặc khi nhân viên tạm giữ, chuyển cuộc gọi (để CRM hoặc core banking giữ giao dịch).
 - **Đăng nhập:** bảng điều khiển mở ở `/login`. Lần chạy đầu tạo tài khoản `admin` với mật khẩu `VG_ADMIN_PASSWORD` (không đặt thì mật khẩu ngẫu nhiên được ghi vào `data/admin-password.txt`). Mọi tài khoản dùng được toàn bộ màn hình; thêm, khóa tài khoản và đổi mật khẩu bằng `python -m voiceguard.users add|list|passwd|disable|enable`. Phiên đăng nhập là cookie HttpOnly hết hạn sau `VG_SESSION_HOURS` giờ (mặc định 12); sai mật khẩu 5 lần trong 5 phút thì tài khoản bị tạm chặn.
 - **Kết nối tổng đài:** PBX gọi các API cuộc gọi với `Authorization: Bearer <VG_API_KEY>`; khóa này chỉ mở được luồng cuộc gọi và `/v1/analyze`, không đọc được lịch sử.
-- **Mô phỏng tổng đài:** `VG_API_KEY=<khóa> VG_SIM_PASSWORD=<mật khẩu> python -m voiceguard.simulate --url http://localhost:8000 --calls 20 --user admin` mở 20 cuộc gọi đồng thời, phát âm thanh của thư viện mẫu qua codec của từng đường dây với tốc độ thật; `--user` dùng để đăng ký sẵn số khách hàng.
+- **Mô phỏng tổng đài:** `VG_API_KEY=<khóa> VG_SIM_PASSWORD=<mật khẩu> python -m voiceguard.simulate --url http://localhost:8000 --calls 20 --user admin` mở 20 cuộc gọi đồng thời, phát âm thanh của thư viện mẫu qua codec của từng đường dây với tốc độ thật; `--user` dùng để đăng ký sẵn số khách hàng. `VG_SIM_PASSWORD` là mật khẩu của chính tài khoản `--user`; không đặt thì dùng `VG_ADMIN_PASSWORD`. Cuối lượt chạy có hai bảng đếm: mức cuối cùng (theo điểm trung bình cả cuộc) và mức cao nhất trong cuộc gọi; bảng điều khiển và `/v1/stats` đếm theo mức cao nhất, nên hai bảng có thể chênh nhau.
 
 ## Chạy dịch vụ
 
@@ -94,6 +94,8 @@ python -m voiceguard.samples --out samples --n 4 \
     --sea $SEA/flac --sea_systems $SEA/systems.txt \
     --own my_clips --own_labels my_clips/labels.txt   # tùy chọn: mẫu tự thu, mỗi dòng "tên bonafide|spoof [hệ thống]"
 ```
+
+`--itw_labels` nhận `meta.csv` của In-the-Wild (`file,speaker,label`) hoặc tệp nhãn dạng `tên nhãn` mỗi dòng; với dạng sau, thư viện mẫu không có tên người nói. `--asv5_protocol` là tệp `ASVspoof5.dev.track_1.tsv`.
 
 `samples/` không được đưa vào git: SEA-Spoof chỉ dùng cho học thuật và không được phân phối lại. Đặt `VG_SAMPLES` nếu thư viện nằm ở chỗ khác.
 

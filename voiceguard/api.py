@@ -538,7 +538,7 @@ async def end_call(call_id: str, user=Depends(need(connector=True))):
                          recording=int(_finish_recording(call)))
     result = dict(request_id=call_id, duration_s=round(call.received / SR, 2), mode="stream",
                   n_segments=len(call.scores), skipped_silent=call.skipped, caller_category=call.category,
-                  channel_simulated=call.channel, timing_ms=dict(wall_s=round(time.time() - call.started, 2)), **dec)
+                  channel_simulated=call.channel, max_level=call.max_level, timing_ms=dict(wall_s=round(time.time() - call.started, 2)), **dec)
     _audit(result, call.sha.hexdigest(), None)
     BUS.publish(dict(type="call_ended", call=_store().get_call(call_id)))
     return result

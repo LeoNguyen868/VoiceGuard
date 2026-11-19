@@ -85,7 +85,8 @@ def run_call(i, args, clips, pools, rng, stats, lock):
             break                                                             # fraudster hangs up
     end = http(f"{args.url}/v1/calls/{cid}/end")
     with lock:
-        stats[end["risk_level"] or "none"] = stats.get(end["risk_level"] or "none", 0) + 1
+        for key, level in (("final", end["risk_level"]), ("peak", end.get("max_level"))):
+            stats[key][level or "none"] = stats[key].get(level or "none", 0) + 1
 
 
 def main():
@@ -100,7 +101,8 @@ def main():
     ap.add_argument("--spoof_share", type=float, default=0.1, help="share of non-fraudster calls with a spoofed clip")
     ap.add_argument("--samples", default="samples", help="sample library (manifest.json); empty = synthetic audio")
     ap.add_argument("--seed", type=int, default=0)
-    ap.add_argument("--user", default="", help="console account that registers the simulated customers (password in VG_SIM_PASSWORD)")
+    ap.add_argument("--user", default="", help="console account that registers the simulated customers "
+                         "(password in VG_SIM_PASSWORD, else VG_ADMIN_PASSWORD)")
     args = ap.parse_args()
     rng = np.random.default_rng(args.seed)
     random.seed(args.seed)
@@ -114,14 +116,17 @@ def main():
     pools = dict(registered=[phone(rng) for _ in range(30)], fraudster=[phone(rng) for _ in range(3)], unknown=[])
     if args.user:                                                            # number lists need a console account
         jar = urllib.request.build_opener(urllib.request.HTTPCookieProcessor())
-        jar.open(f"{args.url}/v1/auth/login", urllib.parse.urlencode(
-            dict(username=args.user, password=os.environ.get("VG_SIM_PASSWORD", ""))).encode())
+        pw = os.environ.get("VG_SIM_PASSWORD") or os.environ.get("VG_ADMIN_PASSWORD", "")
+        try:
+            jar.open(f"{args.url}/v1/auth/login", urllib.parse.urlencode(dict(username=args.user, password=pw)).encode())
+        except urllib.error.HTTPError as e:
+            raise SystemExit(f"login as {args.user!r} failed ({e.code}): set VG_SIM_PASSWORD to that account's password")
         for n in pools["registered"]:
             jar.open(f"{args.url}/v1/numbers", urllib.parse.urlencode(dict(number=n, list="registered", note="Khách hàng")).encode())
     else:
         pools["registered"] = []
     print(f"{args.calls} calls, {len(clips) or 'synthetic'} clips, {args.duration:.0f} s each, url {args.url}")
-    stats, lock, threads = {}, threading.Lock(), []
+    stats, lock, threads = dict(final={}, peak={}), threading.Lock(), []
     sem = threading.Semaphore(args.concurrent or args.calls)
 
     def worker(i, seed):
@@ -136,7 +141,8 @@ def main():
         threads.append(t)
     for t in threads:
         t.join()
-    print("final risk levels:", stats)
+    print("final risk levels (mean score of the call):", stats["final"])
+    print("highest level during the call (counted by the console and /v1/stats):", stats["peak"])
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 # CPU: pip install torch --index-url https://download.pytorch.org/whl/cpu
-# GPU: pip install torch --index-url https://download.pytorch.org/whl/cu128
+# GPU: pip install torch --index-url https://download.pytorch.org/whl/cu130
 torch>=2.4
 transformers>=4.45,<5
 librosa>=0.10
